@@ -1,6 +1,6 @@
 {
   "name": "google-places",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "Google Places, Routes and Geocoding for agents: search, nearby, details, routes, photos.",
