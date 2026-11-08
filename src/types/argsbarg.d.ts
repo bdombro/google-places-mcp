@@ -1,11 +1,11 @@
-import type { AppDb } from "../db/index.ts";
+import type { PlacesConfig } from "../config.ts";
+import type { Http } from "../google/client.ts";
 
 declare module "argsbarg" {
   interface Locals {
-    db: AppDb;
-  }
-
-  interface ServerState {
-    db?: AppDb;
+    /** Sends HTTP requests to Google; replaced with a mock in tests. */
+    http: Http;
+    /** Reads settings from the environment on demand; replaced in tests. */
+    config: () => PlacesConfig;
   }
 }

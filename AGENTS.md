@@ -38,7 +38,10 @@ When adding or changing commands, schemas, or MCP exposure:
 | `src/app.ts` | App spec: `commands: […]` (alphabetical by key) | Command handlers, business logic |
 | `src/create-identity.ts` | Key, release repo, description (rewritten by `argsbarg create`) | Anything else |
 | `src/types/` | Module augmentations (`argsbarg.d.ts`: `Locals`, `ServerState`) | Runtime logic |
-| `src/db/` | `AppDb` (SQLite connect, migrate, domain access), `migrations/*.sql` | Command handlers |
+| `src/config.ts` | Settings from the environment (key, home area, region, language, time zone) | Network calls |
+| `src/google/` | One module per Google API (`places.ts`, `routes.ts`, `geocode.ts`) plus the HTTP client (`client.ts`: key handling, error mapping, injectable transport) | Command handlers, output schemas |
+| `src/schemas.ts`, `src/format.ts` | Output shapes shared by the place tools; CLI text rendering | Google calls |
+| `src/util.ts` | Pure helpers: coordinates, distances, text cleaning, durations, departure times | Env or network access |
 | `src/commands/<name>/` | One command: `command.ts` (with its Zod schemas), colocated `*.test.ts` | Shared helpers (lift them out) |
 | `scripts/` | Dev tooling (release) | Production command paths |
 
@@ -67,4 +70,11 @@ When adding or changing commands, schemas, or MCP exposure:
 
 ## App conventions
 
-Replace with app-specific bullets.
+- **Every Google call goes through `request()`** in `src/google/client.ts`. The transport is `ctx.locals.http` (set by `attachGoogle`; tests swap in `mockHttp` via `appWithHttp`). Tests never hit the network; manual smoke tests with the real key must be read-only (`geocode`, `status --probe`).
+- **Stay in Google's Pro tier or below.** Field masks live in `src/google/places.ts`, and tests assert none of them contains an Enterprise field (rating, userRatingCount, priceLevel, opening hours, phone, website, reviews, editorialSummary, atmosphere attributes). Don't add one without Brian's say-so, and update the README's "What's not included" section if you do.
+- **The API key never leaves `client.ts`.** It goes in a header (query parameter for Geocoding) and is scrubbed from every error. Never put it in tool output, logs or test fixtures.
+- **Place text is untrusted.** Names, addresses and photo credits come from businesses and the public: run them through `cleanText`, keep the `notice` on results, and keep the MCP instructions saying so.
+- **Validate before interpolating into a URL path.** Place IDs and photo references are checked against strict regexes (`asPlaceId`, `PHOTO_NAME`) before they're used in a path.
+- **Home area is configuration, not code.** `PLACES_HOME` comes from the environment; keep the real house location out of the repo and the docs.
+- **Traffic-aware routing is opt-in** (`departAt` or `traffic`); the default is the cheaper static estimate.
+- **No native MCP images.** The argsbarg version in use can't return image blocks, so `photo` returns a URL.
