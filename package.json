@@ -1,0 +1,18 @@
+{
+  "name": "google-places",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Google Places, Routes and Geocoding for agents: search, nearby, details, routes, photos.",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.0",
+    "@types/node": "^22",
+    "argsbarg": "^8.2.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^7.0.2",
+    "zod": "^4"
+  }
+}
