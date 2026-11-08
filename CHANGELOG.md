@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Built with argsbarg 8.3.0, so the bundle can join an `argsbarg gateway` (one process for several plugins).
+
 ### Added
 
 - Tools: `search`, `nearby`, `resolve`, `details`, `photo` (Places API New), `route`, `matrix` (Routes API), `geocode` (Geocoding API) and `status`.
