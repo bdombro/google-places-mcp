@@ -1,6 +1,6 @@
 {
   "name": "google-places",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Google Places, Routes and Geocoding for agents: search, nearby, details, routes, photos.",
   "author": {
     "name": "Brian Dombrowski"

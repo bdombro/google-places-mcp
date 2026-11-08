@@ -84,6 +84,8 @@ Requires Node 20 or later on PATH; the bundle `dist/google-places.mjs` is commit
 - **Cursor:** `just plugin-cursor-upsert`.
 - **Any MCP client:** run `node dist/google-places.mjs mcp` (see the workspace `.mcp.json`).
 
+Errors go to this plugin's Bugsink project (bugsink.btek.cc); set `BUGSINK_DSN=""` to disable.
+
 ## Development
 
 ```bash

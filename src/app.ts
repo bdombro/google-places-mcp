@@ -6,6 +6,7 @@ The version is read from `package.json` at runtime, so the same code runs from
 
 import { readFileSync } from "node:fs";
 import { argsbarg } from "argsbarg";
+import { errors } from "./bugsink.ts";
 import { detailsCommand } from "./commands/details/command.ts";
 import { geocodeCommand } from "./commands/geocode/command.ts";
 import { matrixCommand } from "./commands/matrix/command.ts";
@@ -30,6 +31,7 @@ function packageFile(
 const version = (JSON.parse(packageFile("package.json")) as { version: string }).version;
 
 export const app = argsbarg({
+  errorReporter: errors,
   commands: [
     detailsCommand,
     geocodeCommand,
