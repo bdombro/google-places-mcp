@@ -1,98 +1,153 @@
 # google-places
 
-Google Maps for AI agents over MCP (and a CLI): find places, look up details, get travel times and distances, convert addresses. Built on the Google Places API (New), Routes API and Geocoding API.
-
-It is deliberately limited to Google's cheaper tiers. See [What's not included](#whats-not-included).
-
-## Tools
-
-| Tool | Does | Google API |
-| --- | --- | --- |
-| `search` | Text search ("paediatric dentist Maynooth"), biased to a point; optional category, ranking by distance | Places (Pro) |
-| `nearby` | Places of given categories within a radius of a point, ranked by popularity or distance | Places (Pro) |
-| `resolve` | A name or address to candidate places with IDs, canonical addresses and coordinates | Places (Pro) |
-| `details` | One place by ID or name: address, types, status, Maps link, time zone, accessibility, photo references | Places (Pro) |
-| `photo` | The short-lived image URL for a photo reference from `details` | Places (free) |
-| `route` | Travel time and distance A to B by car, walking, bike, transit or two-wheeler; optional departure time, avoid tolls, alternatives, steps | Routes |
-| `matrix` | Times and distances for every pair of up to 25 origins and 25 destinations | Routes |
-| `geocode` | Address to coordinates, or `lat,lng` to address | Geocoding |
-| `status` | Settings in effect; `--probe` checks which APIs the key can reach | all |
-
-Points in `route` and `matrix` can be addresses, place names, place IDs, `lat,lng` or `home`. Searches default to the home area.
-
-```bash
-google-places search "pharmacy" --near "Maynooth Educate Together" --rank distance
-google-places nearby --types playground,park --radius 2000
-google-places details "Supervalu Maynooth" --photos 2
-google-places route home "Dublin Airport" --departAt 07:30 --avoid tolls
-google-places matrix --origins "home|Maynooth Library" --destinations "Heuston Station|Connolly Station" --mode transit
-google-places geocode "53.3813,-6.5918"
-google-places status --probe
+```
+       .-""""-.
+      /  .--.  \
+      | (    ) |
+       \  '--' /
+        '----'
+          ||
 ```
 
-Add `--json` for JSON on the CLI; MCP always returns JSON.
+Use this MCP to find places, compare nearby options, check routes and travel times, and work with addresses through Google Maps.
 
-## What's not included
+Every Places request is restricted to Google's **Pro tier and below**, so agent searches cannot trigger Enterprise-tier per-request billing. Place photos can be returned as native MCP images, ready for the agent to inspect.
 
-Google bills Places requests by the **fields** asked for, in tiers. Text search and nearby search start at the **Pro** tier (anything beyond IDs), and the fields people usually want next are **Enterprise**. To keep costs low and predictable, this plugin only requests Pro-tier fields and below, and does not offer:
+## Features
 
-| Not available | Google tier |
+- Search and resolve places, inspect details, geocode addresses, and fetch photos.
+- Calculate routes and travel-time matrices for common travel modes.
+- Pro-tier field masks keep Place requests below Enterprise billing.
+- Small footprint: a standalone MCP binary with no Node/V8 runtime.
+
+## `.mcp.json` Configuration
+
+In the `assistant2` workspace, `google-places` is mounted into the unified `dist/assistant-mcp` gateway under the `places_` prefix (`places_search`, `places_nearby`, `places_details`, `places_resolve`, `places_geocode`, `places_route`, `places_matrix`, `places_photo`, `places_status`).
+
+To run `google-places` as a standalone MCP server in `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "google-places": {
+      "command": "/Users/briandombrowski/dev/bdombro/assistant/assistant2/plugins/google-places/dist/google-places",
+      "args": ["mcp"],
+      "env": {
+        "GOOGLE_PLACES_API_KEY": "${GOOGLE_PLACES_API_KEY}",
+        "PLACES_HOME": "53.3813,-6.5918",
+        "PLACES_REGION": "ie",
+        "PLACES_LANGUAGE": "en",
+        "PLACES_TIMEZONE": "Europe/Dublin"
+      }
+    }
+  }
+}
+```
+
+## App Architecture
+
+The standalone MCP and JSON CLI are implemented in C++26 on `slimr-cpp`.
+
+```text
+plugins/google-places/
+├── justfile                  # `just test` (ASan + UBSan) and `just build` (-O3 -flto)
+├── README.md                 # User & operator documentation
+├── AGENTS.md                 # Maintainer & AI agent conventions
+├── src/
+│   ├── types.hpp             # Core types (`LatLng`, `DEFAULT_HOME`, `PlacesConfig`)
+│   ├── util.hpp              # Haversine distance, duration formatting, `resolveTime`, `cleanText`, Base64
+│   ├── google_client.hpp     # Injectable `HttpTransport` over `slimr/curl.hpp`, key scrubber, failure classifier
+│   ├── places.hpp            # Places API v1 (`search`, `nearby`, `details`, `photo`) with Pro-tier field masks
+│   ├── geocode.hpp           # Geocoding API (forward and reverse geocoding)
+│   ├── routes.hpp            # Routes API v2 (`computeRoutes` and `computeRouteMatrix`)
+│   ├── app.hpp               # `make_google_places_app()` registering all 9 tools, annotations & Bugsink DSN
+│   └── main.cpp              # Standalone CLI & stdio MCP entrypoint
+├── tests/
+│   └── test_main.cpp         # 44 unit & mock-transport test cases (307 assertions, zero network calls)
+└── dist/
+    └── google-places         # Standalone ARM64 release binary (~866 KB)
+```
+
+### Libraries Used
+
+- **`<slimr/mcp.hpp>` & `<slimr/reflect.hpp>`:** Typed MCP tool definitions, compile-time JSON Schema generation, native MCP `McpResult::image(...)` blocks, and narrow JSON CLI.
+- **`<slimr/curl.hpp>` (`-lcurl`):** HTTPS requests to `places.googleapis.com`, `routes.googleapis.com`, and `maps.googleapis.com`.
+- **`<slimr/json.hpp>` (`glaze`):** RFC-8259 JSON serialization and parsing.
+- **`<slimr/bugsink.hpp>` (`-lcurl`):** Automatic error reporting to `bugsink.btek.cc`.
+- **`<slimr/test.hpp>` (`doctest`):** Mock-HTTP unit test suite compiled with `-fsanitize=address,undefined`.
+
+## Tools & CLI Commands
+
+Every tool is available over MCP (`google-places mcp` or via `assistant-mcp` under the `places_` prefix) and on the CLI (`google-places <tool> ['{"arg":"val"}']`).
+
+| Tool | Gateway Name | Google API | Description |
+| --- | --- | --- | --- |
+| `search` | `places_search` | Places (Pro) | Text search (`"paediatric dentist Maynooth"`), biased toward a location (`near`, defaulting to `home`); optional `type`, `rankBy` (`relevance` or `distance`), `limit`. |
+| `nearby` | `places_nearby` | Places (Pro) | Places matching `types` (and optional `excludeTypes`) within `radiusMeters` of `near` (default `home`), ranked by `popularity` or `distance`. |
+| `resolve` | `places_resolve` | Places (Pro) | Resolve a name or address string into candidate places with `id`, canonical address, coordinates, and distance from reference point. |
+| `details` | `places_details` | Places (Pro) | Full Pro-tier details for a place ID or name: canonical address, types, business status, Google Maps URI, IANA time zone, accessibility options, and photo references. |
+| `photo` | `places_photo` | Places (free) | Resolves a photo reference (`places/<id>/photos/<ref>`) from `details`. Returns a short-lived `photoUri`, or when `"image": true` is passed, downloads the image bytes and returns a **native MCP image content block**. |
+| `route` | `places_route` | Routes v2 | Travel time and distance from `origin` to `destination` by `drive`, `walk`, `bicycle`, `transit`, or `two_wheeler`; optional `departAt`/`arriveBy`, `traffic`, `avoid` (`tolls`, `highways`, `ferries`), `alternatives`, and turn-by-turn `steps`. |
+| `matrix` | `places_matrix` | Routes v2 | Travel times and distances for every pair of up to 25 `origins` and 25 `destinations`. |
+| `geocode` | `places_geocode` | Geocoding | Forward geocode an address to `lat,lng`, or reverse geocode `"53.3813,-6.5918"` to canonical addresses. |
+| `status` | `places_status` | All | Shows active configuration (`home`, `region`, `language`, `timeZone`, API key presence). Pass `"probe": true` to live-check all three APIs (using an IDs-only Places request that Google does not bill). |
+
+Locations in `search`, `nearby`, `route`, and `matrix` accept place names, street addresses, place IDs (`ChIJ...` or `places/ChIJ...`), `"lat,lng"` coordinates, or `"home"`.
+
+### CLI Examples
+
+```bash
+# Search biased toward a named place, ranked by distance
+./dist/google-places search '{"query":"pharmacy","near":"Maynooth Educate Together","rankBy":"distance"}'
+
+# Nearby playgrounds and parks within 2 km of home
+./dist/google-places nearby '{"types":["playground","park"],"radiusMeters":2000}'
+
+# Place details with up to 2 photo references
+./dist/google-places details '{"place":"Supervalu Maynooth","photos":2}'
+
+# Route from home to Dublin Airport departing at 07:30 local time, avoiding tolls
+./dist/google-places route '{"origin":"home","destination":"Dublin Airport","departAt":"07:30","avoid":["tolls"]}'
+
+# Route matrix by public transit
+./dist/google-places matrix '{"origins":["home","Maynooth Library"],"destinations":["Heuston Station","Connolly Station"],"mode":"transit"}'
+
+# Reverse geocode coordinates
+./dist/google-places geocode '{"query":"53.3813,-6.5918"}'
+
+# Probe API key permissions across Places, Routes, and Geocoding
+./dist/google-places status '{"probe":true}'
+```
+
+## Pro-Tier Cost Guardrails (What's Not Included)
+
+Google bills Places API (New) requests according to the highest-tier field present in `X-Goog-FieldMask`. `src/places.hpp` (`LIST_FIELDS` and `DETAIL_FIELDS`) strictly restricts requests to **Pro tier and below**, and unit tests in `tests/test_main.cpp` assert that no Enterprise or Atmosphere field is ever sent:
+
+| Omitted Data | Google Billing Tier |
 | --- | --- |
-| Ratings and rating counts, price level | Enterprise |
-| Opening hours and "open now" (and filters for them) | Enterprise |
-| Phone numbers and websites | Enterprise |
-| Reviews, editorial summaries, "good for kids" / dine-in / takeout style attributes | Enterprise + Atmosphere |
-| Minimum-rating, open-now and price-level search filters | tied to the above |
+| `rating`, `userRatingCount`, `priceLevel`, `priceRange` | Enterprise |
+| `regularOpeningHours`, `currentOpeningHours` (and `openNow` filters) | Enterprise |
+| `nationalPhoneNumber`, `internationalPhoneNumber`, `websiteUri` | Enterprise |
+| `reviews`, `editorialSummary`, `generativeSummary`, atmosphere booleans | Enterprise + Atmosphere |
 
-What you do get is name, address, coordinates, category, business status, Maps link, time zone, accessibility features and photo references.
+**Included in Pro tier:** `id`, `displayName`, `formattedAddress`, `shortFormattedAddress`, `location`, `types`, `primaryType`, `primaryTypeDisplayName`, `businessStatus`, `googleMapsUri`, `utcOffsetMinutes`, `timeZone`, `accessibilityOptions`, and `photos`.
 
-Field lists are in [src/google/places.ts](src/google/places.ts) (`LIST_FIELDS`, `DETAIL_FIELDS`), and tests assert that no Enterprise field creeps into a request. To add a feature back, add its field to the list, return it in the output schema and update this section. Prices and tier boundaries change: check Google's [pricing](https://developers.google.com/maps/billing-and-pricing/pricing) and [data fields](https://developers.google.com/maps/documentation/places/web-service/data-fields) pages.
+**Untrusted text defense:** Place names and photo author attributions come from third parties. `cleanText()` in `src/util.hpp` strips ASCII control characters, Unicode zero-width characters, and bidirectional overrides (`U+202A..U+202E`, `U+2066..U+2069`), and API keys are scrubbed from all error messages.
 
-Routes: the default driving estimate is static. `departAt` or `traffic` switches on traffic-aware routing, which Google prices in a higher Routes tier.
-
-Other limits:
-- **`photo` returns a URL, not an image.** The argsbarg version this plugin uses cannot return native MCP image blocks. The URL expires after a while.
-- **Names are untrusted text.** Businesses and the public write names and photo credits, so every result carries a notice and the MCP instructions say to treat it as data, never instructions. Text is stripped of control and zero-width characters.
-
-## Setup
-
-1. **Enable the APIs.** The key must belong to a Google Cloud project with billing enabled and these APIs on:
-   - [Places API (New)](https://console.cloud.google.com/apis/library/places.googleapis.com) (needed by `search`, `nearby`, `resolve`, `details`, `photo`)
-   - [Routes API](https://console.cloud.google.com/apis/library/routes.googleapis.com) (needed by `route`, `matrix`)
-   - [Geocoding API](https://console.cloud.google.com/apis/library/geocoding-backend.googleapis.com) (needed by `geocode`)
-
-   Open each page with the right project selected and click **Enable**, or run `gcloud services enable places.googleapis.com routes.googleapis.com geocoding-backend.googleapis.com --project=<project-id>`. A disabled API fails with "not enabled for this API key's Google Cloud project" and the exact activation link. It can take a few minutes to take effect.
-2. **Set the key** in your login shell: `GOOGLE_PLACES_API_KEY` (`GOOGLE_PLACE_API_KEY` also works).
-3. **Restrict the key** (Credentials, API restrictions) to those three APIs, and cap daily usage under each API's Quotas page, so a looping agent can't run up a bill.
-4. **Check it:** `google-places status --probe` calls each API once (the Places probe is an IDs-only request, which Google doesn't bill).
-
-### Settings
+## Configuration (Environment Variables)
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `GOOGLE_PLACES_API_KEY` | none (`GOOGLE_PLACE_API_KEY` also read) | API key |
-| `PLACES_HOME` | `53.3813,-6.5918` (Maynooth centre) | `lat,lng` that biases searches and means `home` in routes. Set it to the house in your shell, not in the repo |
-| `PLACES_REGION` | `ie` | Region bias for results |
-| `PLACES_LANGUAGE` | `en` | Language of names and addresses |
-| `PLACES_TIMEZONE` | `Europe/Dublin` | Zone for local `departAt` / `arriveBy` times |
+| `GOOGLE_PLACES_API_KEY` | none (`GOOGLE_PLACE_API_KEY` also read) | Google Cloud API key restricted to Places API (New), Routes API, and Geocoding API |
+| `PLACES_HOME` | `53.3813,-6.5918` (Maynooth centre) | Default `"lat,lng"` for search bias and `"home"` waypoint in routes |
+| `PLACES_REGION` | `ie` | CLDR region code for search bias |
+| `PLACES_LANGUAGE` | `en` | BCP-47 language code for returned names and addresses |
+| `PLACES_TIMEZONE` | `Europe/Dublin` | IANA timezone for local `departAt` / `arriveBy` timestamps |
+| `BUGSINK_DSN` | Project DSN on `bugsink.btek.cc` | Error reporting DSN (`""` disables) |
 
-## Install
-
-Requires Node 20 or later on PATH; the bundle `dist/google-places.mjs` is committed, so there is no install step.
-
-- **Claude Code plugin:** `just plugin-claude-install`, then restart Claude Code.
-- **Cursor:** `just plugin-cursor-upsert`.
-- **Any MCP client:** run `node dist/google-places.mjs mcp` (see the workspace `.mcp.json`).
-
-Errors go to this plugin's Bugsink project (bugsink.btek.cc); set `BUGSINK_DSN=""` to disable.
-
-## Development
+## Building & Testing
 
 ```bash
-just setup    # npm install
-just test     # Biome + tsc + node --test (no network)
-just build    # rebuild the committed bundle
-just run status --probe
+just test     # Run 44 unit & mock-transport tests (307 assertions) with ASan + UBSan (zero network calls)
+just build    # Build optimized ARM64 release binary (-O3 -flto) at dist/google-places
 ```
-
-Tests mock the HTTP transport (`ctx.locals.http`), so they never call Google. Manual checks with a real key should stay read-only (`geocode`, `status --probe`). Commit `dist/google-places.mjs` whenever the source changes. Releases: `just release <major|minor|patch>`.
