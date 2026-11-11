@@ -1,15 +1,17 @@
-# AGENTS.md (`google-places`)
+# AGENTS.md (`google-places-mcp`)
 
-Written for: AI coding agents working in the `google-places` C++26 plugin repository.
+Written for: AI coding agents working in the `google-places-mcp` C++26 plugin repository.
 
-`google-places` is a C++26 MCP plugin and CLI built on `slimr-cpp` wrapping the Google Places API (New), Routes API v2, and Geocoding API over `libcurl`, strictly locked to **Pro tier and below**.
+`google-places-mcp` is a C++26 MCP plugin and CLI built on `slimr-cpp` wrapping the Google Places API (New), Routes API v2, and Geocoding API over `libcurl`, strictly locked to **Pro tier and below**.
 
 ## Commands
 
 | Task | Command |
 | --- | --- |
 | Run unit & mock-HTTP tests (ASan + UBSan, no network) | `just test` |
-| Build release binary (`dist/google-places`) | `just build` |
+| Build and test release binary (`build/bin/google-places-mcp`) | `just build` |
+| Analyze app and test translation units | `just lint` |
+| Verify isolated MCP initialization and tool discovery | `just test-mcp` |
 | Clean build artifacts | `just clean` |
 
 ## Module Boundaries
@@ -31,3 +33,12 @@ Written for: AI coding agents working in the `google-places` C++26 plugin reposi
 2. **Untrusted Text Sanitization:** Every display name, address, step instruction, and photo attribution returned from Google must pass through `cleanText()` to strip control, zero-width, and bidi override characters.
 3. **API Key Scrubbing:** All errors and URLs surfaced to callers or Bugsink must pass through `scrub(text, apiKey)` so `GOOGLE_PLACES_API_KEY` never leaks.
 4. **Offline Tests:** `just test` must always mock `HttpTransport` and never hit the network or consume quota.
+
+## C++ Memory Safety
+
+- Immediately wrap owned C handles, allocations, descriptors, and temporary resources in RAII. Make owning wrappers noncopyable unless copying creates independent ownership; moves must leave the source safely destructible.
+- Borrow views, pointers, and references only for the current call by default. Store owning values unless lifetime/invalidation guarantees are explicit. Deferred callbacks require explicit ownership-safe captures; no escaping reference captures without a demonstrated lifetime guarantee.
+- Initialize scalar/pointer members at declaration and local values before use. Compiler auto-initialization is defense in depth, not permission for uninitialized reads.
+- Check range/overflow before narrowing lengths/counts at C API boundaries; casts alone are not validation. Report invalid inputs using existing error mechanisms.
+- Never let C++ exceptions escape C callbacks. Translate them into the C API's error/abort mechanism and propagate failures at the C++ boundary; do not silently swallow them.
+- Preserve hardening, zero auto-initialization, ASan/UBSan with fatal reports, and required lint/tests. These checks do not prove memory safety.

@@ -1,4 +1,4 @@
-# google-places
+# google-places-mcp
 
 ```
        .-""""-.
@@ -22,15 +22,15 @@ Every Places request is restricted to Google's **Pro tier and below**, so agent 
 
 ## `.mcp.json` Configuration
 
-In the `assistant2` workspace, `google-places` is mounted into the unified `dist/assistant-mcp` gateway under the `places_` prefix (`places_search`, `places_nearby`, `places_details`, `places_resolve`, `places_geocode`, `places_route`, `places_matrix`, `places_photo`, `places_status`).
+In the `assistant2` workspace, `google-places-mcp` is mounted into the unified `build/bin/assistant-mcp` gateway under the `places_` prefix (`places_search`, `places_nearby`, `places_details`, `places_resolve`, `places_geocode`, `places_route`, `places_matrix`, `places_photo`, `places_status`).
 
-To run `google-places` as a standalone MCP server in `.mcp.json`:
+To run `google-places-mcp` as a standalone MCP server in `.mcp.json`:
 
 ```json
 {
   "mcpServers": {
-    "google-places": {
-      "command": "/Users/briandombrowski/dev/bdombro/assistant/assistant2/plugins/google-places/dist/google-places",
+    "google-places-mcp": {
+      "command": "/absolute/path/to/build/bin/google-places-mcp",
       "args": ["mcp"],
       "env": {
         "GOOGLE_PLACES_API_KEY": "${GOOGLE_PLACES_API_KEY}",
@@ -49,14 +49,16 @@ To run `google-places` as a standalone MCP server in `.mcp.json`:
 The standalone MCP and JSON CLI are implemented in C++26 on `slimr-cpp`.
 
 ```text
-plugins/google-places/
-├── justfile                  # `just test` (ASan + UBSan) and `just build` (-O3 -flto)
+plugins/google-places-mcp/
+├── vcpkg.json                # Independently resolved dependencies
+├── CMakeLists.txt            # App/test targets and transitive dependency linking
+├── justfile                  # Thin CMake/Ninja orchestration
 ├── README.md                 # User & operator documentation
 ├── AGENTS.md                 # Maintainer & AI agent conventions
 ├── src/
 │   ├── types.hpp             # Core types (`LatLng`, `DEFAULT_HOME`, `PlacesConfig`)
 │   ├── util.hpp              # Haversine distance, duration formatting, `resolveTime`, `cleanText`, Base64
-│   ├── google_client.hpp     # Injectable `HttpTransport` over `slimr/curl.hpp`, key scrubber, failure classifier
+│   ├── google_client.hpp     # Injectable `HttpTransport` over `curl.hpp`, key scrubber, failure classifier
 │   ├── places.hpp            # Places API v1 (`search`, `nearby`, `details`, `photo`) with Pro-tier field masks
 │   ├── geocode.hpp           # Geocoding API (forward and reverse geocoding)
 │   ├── routes.hpp            # Routes API v2 (`computeRoutes` and `computeRouteMatrix`)
@@ -64,21 +66,21 @@ plugins/google-places/
 │   └── main.cpp              # Standalone CLI & stdio MCP entrypoint
 ├── tests/
 │   └── test_main.cpp         # 44 unit & mock-transport test cases (307 assertions, zero network calls)
-└── dist/
-    └── google-places         # Standalone ARM64 release binary (~866 KB)
+└── build/bin/
+    └── google-places-mcp     # Standalone release binary
 ```
 
 ### Libraries Used
 
-- **`<slimr/mcp.hpp>` & `<slimr/reflect.hpp>`:** Typed MCP tool definitions, compile-time JSON Schema generation, native MCP `McpResult::image(...)` blocks, and narrow JSON CLI.
-- **`<slimr/curl.hpp>` (`-lcurl`):** HTTPS requests to `places.googleapis.com`, `routes.googleapis.com`, and `maps.googleapis.com`.
-- **`<slimr/json.hpp>` (`glaze`):** RFC-8259 JSON serialization and parsing.
-- **`<slimr/bugsink.hpp>` (`-lcurl`):** Automatic error reporting to `bugsink.btek.cc`.
-- **`<slimr/test.hpp>` (`doctest`):** Mock-HTTP unit test suite compiled with `-fsanitize=address,undefined`.
+- **`<mcp.hpp>` & `<reflect.hpp>`:** Typed MCP tool definitions, compile-time JSON Schema generation, native MCP `McpResult::image(...)` blocks, and narrow JSON CLI.
+- **`<curl.hpp>` (`-lcurl`):** HTTPS requests to `places.googleapis.com`, `routes.googleapis.com`, and `maps.googleapis.com`.
+- **`<json.hpp>` (`glaze`):** RFC-8259 JSON serialization and parsing.
+- **`<bugsink.hpp>` (`-lcurl`):** opt-in error reporting through `BUGSINK_DSN`.
+- **`<test.hpp>` (`doctest`):** Mock-HTTP unit test suite compiled with `-fsanitize=address,undefined`.
 
 ## Tools & CLI Commands
 
-Every tool is available over MCP (`google-places mcp` or via `assistant-mcp` under the `places_` prefix) and on the CLI (`google-places <tool> ['{"arg":"val"}']`).
+Every tool is available over MCP (`google-places-mcp mcp` or via `assistant-mcp` under the `places_` prefix) and on the CLI (`google-places-mcp <tool> ['{"arg":"val"}']`).
 
 | Tool | Gateway Name | Google API | Description |
 | --- | --- | --- | --- |
@@ -98,25 +100,25 @@ Locations in `search`, `nearby`, `route`, and `matrix` accept place names, stree
 
 ```bash
 # Search biased toward a named place, ranked by distance
-./dist/google-places search '{"query":"pharmacy","near":"Maynooth Educate Together","rankBy":"distance"}'
+./build/bin/google-places-mcp search '{"query":"pharmacy","near":"Maynooth Educate Together","rankBy":"distance"}'
 
 # Nearby playgrounds and parks within 2 km of home
-./dist/google-places nearby '{"types":["playground","park"],"radiusMeters":2000}'
+./build/bin/google-places-mcp nearby '{"types":["playground","park"],"radiusMeters":2000}'
 
 # Place details with up to 2 photo references
-./dist/google-places details '{"place":"Supervalu Maynooth","photos":2}'
+./build/bin/google-places-mcp details '{"place":"Supervalu Maynooth","photos":2}'
 
 # Route from home to Dublin Airport departing at 07:30 local time, avoiding tolls
-./dist/google-places route '{"origin":"home","destination":"Dublin Airport","departAt":"07:30","avoid":["tolls"]}'
+./build/bin/google-places-mcp route '{"origin":"home","destination":"Dublin Airport","departAt":"07:30","avoid":["tolls"]}'
 
 # Route matrix by public transit
-./dist/google-places matrix '{"origins":["home","Maynooth Library"],"destinations":["Heuston Station","Connolly Station"],"mode":"transit"}'
+./build/bin/google-places-mcp matrix '{"origins":["home","Maynooth Library"],"destinations":["Heuston Station","Connolly Station"],"mode":"transit"}'
 
 # Reverse geocode coordinates
-./dist/google-places geocode '{"query":"53.3813,-6.5918"}'
+./build/bin/google-places-mcp geocode '{"query":"53.3813,-6.5918"}'
 
 # Probe API key permissions across Places, Routes, and Geocoding
-./dist/google-places status '{"probe":true}'
+./build/bin/google-places-mcp status '{"probe":true}'
 ```
 
 ## Pro-Tier Cost Guardrails (What's Not Included)
@@ -143,11 +145,23 @@ Google bills Places API (New) requests according to the highest-tier field prese
 | `PLACES_REGION` | `ie` | CLDR region code for search bias |
 | `PLACES_LANGUAGE` | `en` | BCP-47 language code for returned names and addresses |
 | `PLACES_TIMEZONE` | `Europe/Dublin` | IANA timezone for local `departAt` / `arriveBy` timestamps |
-| `BUGSINK_DSN` | Project DSN on `bugsink.btek.cc` | Error reporting DSN (`""` disables) |
+| `BUGSINK_DSN` | unset (disabled) | Error reporting DSN (`""` disables) |
 
 ## Building & Testing
 
+Use Clang with C++26 and libc++ FAST hardening, CMake 3.31+, Ninja, [just](https://just.systems), a bootstrapped [vcpkg](https://vcpkg.io), Node for Inspector, and a compatible clang-tidy (LLVM 23 locally). Set `VCPKG_ROOT` and put vcpkg and the tools on `PATH`. Linux additionally needs libc++ and libc++abi; select libc++ with `CXXFLAGS=-stdlib=libc++`.
+
+Dependencies are declared in `vcpkg.json`. During local development, `(cd /absolute/path/to/slimr-cpp && just publish --local --all)` publishes ports into vcpkg's local overlay; export `VCPKG_OVERLAY_PORTS="$VCPKG_ROOT/local-ports"` in your shell. `just deps` installs into `build/deps/` for the detected native triplet. `configure` always runs it, with CMake manifest installation disabled. CMake links installed `slimr::mcp` and `slimr::test` targets, never source-header overrides.
+
 ```bash
-just test     # Run 44 unit & mock-transport tests (307 assertions) with ASan + UBSan (zero network calls)
-just build    # Build optimized ARM64 release binary (-O3 -flto) at dist/google-places
+just test      # Debug ASan/UBSan mock-transport tests, no network/quota use
+just build     # Optimized IPO Release app and tests; build/bin/google-places-mcp
+just lint      # App and test translation units using the Debug compilation database
+just test-mcp  # Pinned Inspector 2.14.0: initialize and tools/list only
+just run status
+just clean     # Remove build/ only; leaves legacy dist/ and user data untouched
 ```
+
+Debug and Release graphs live in `build/cmake/Debug/` and `build/cmake/Release/`; only Release apps are emitted to `build/bin/`. Set `CXX` before the first configure to choose a compiler; CMake retains its absolute path even when lint uses a different `PATH`. Both configurations enable libc++ hardening and zero automatic-variable initialization; Debug uses fatal UBSan reports. Inspector isolates HOME/XDG directories under `build/`, clears credentials, disables error reporting and external CLI access, and cleans up afterward; it never invokes a tool.
+
+CI runs the same commands on native Linux/macOS. Configure `VCPKG_REF` to the tested full vcpkg commit SHA; slimr packages resolve from the public registry pinned in `vcpkg-configuration.json`, without a dependency token. Local macOS validation is not Linux execution evidence.

@@ -1,7 +1,7 @@
 #define SLIMR_TEST_MAIN
-#include "slimr/test.hpp"
-#include "slimr/json.hpp"
-#include "slimr/mcp.hpp"
+#include "test.hpp"
+#include "json.hpp"
+#include "mcp.hpp"
 
 #include "app.hpp"
 #include "geocode.hpp"

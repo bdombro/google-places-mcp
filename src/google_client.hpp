@@ -2,8 +2,8 @@
 
 #include "types.hpp"
 #include "util.hpp"
-#include "slimr/curl.hpp"
-#include "slimr/json.hpp"
+#include "curl.hpp"
+#include "json.hpp"
 
 #include <functional>
 #include <map>
