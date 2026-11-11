@@ -45,7 +45,7 @@ endif()
 
 add_executable(google-places-mcp src/main.cpp)
 target_include_directories(google-places-mcp PRIVATE src)
-target_link_libraries(google-places-mcp PRIVATE slimr::mcp app_options)
+target_link_libraries(google-places-mcp PRIVATE slimr::mcp slimr::mcp_http app_options)
 set_target_properties(google-places-mcp PROPERTIES
     INTERPROCEDURAL_OPTIMIZATION_RELEASE ON
     RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/build/bin")
@@ -54,9 +54,10 @@ if(BUILD_TESTING)
     find_package(slimr-test CONFIG REQUIRED)
     add_executable(google_places_mcp_test tests/test_main.cpp)
     target_include_directories(google_places_mcp_test PRIVATE src)
-    target_link_libraries(google_places_mcp_test PRIVATE slimr::mcp slimr::test app_options)
+    target_link_libraries(google_places_mcp_test PRIVATE slimr::mcp slimr::mcp_http slimr::test app_options)
     set_target_properties(google_places_mcp_test PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
     add_test(NAME google_places_mcp COMMAND google_places_mcp_test)
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/test-tmp" "${CMAKE_BINARY_DIR}/test-home")
     set_tests_properties(google_places_mcp PROPERTIES TIMEOUT 120
-        ENVIRONMENT "BUGSINK_DSN=;TMPDIR=${CMAKE_BINARY_DIR}")
+        ENVIRONMENT "BUGSINK_DSN=;TMPDIR=${CMAKE_BINARY_DIR}/test-tmp;HOME=${CMAKE_BINARY_DIR}/test-home;XDG_CONFIG_HOME=${CMAKE_BINARY_DIR}/test-home/config")
 endif()

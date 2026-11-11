@@ -1,4 +1,5 @@
 build/
+Formula/.staging/
 /.ci/
 bin/
 dist/

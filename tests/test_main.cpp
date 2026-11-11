@@ -2,6 +2,7 @@
 #include "test.hpp"
 #include "json.hpp"
 #include "mcp.hpp"
+#include "mcp_http.hpp"
 
 #include "app.hpp"
 #include "geocode.hpp"
@@ -11,8 +12,18 @@
 #include "types.hpp"
 #include "util.hpp"
 
+#include <arpa/inet.h>
+#include <cerrno>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <netinet/in.h>
+#include <poll.h>
+#include <set>
 #include <string>
+#include <sys/socket.h>
+#include <unistd.h>
 #include <vector>
 
 using namespace google_places;
@@ -69,6 +80,8 @@ inline RunResult runTool(PluginApp& app, std::string_view toolName, const Json& 
     req["method"] = "tools/call";
     req["params"]["name"] = std::string(toolName);
     req["params"]["arguments"] = args;
+    req["params"]["_meta"]["io.modelcontextprotocol/protocolVersion"] = "2026-07-28";
+    req["params"]["_meta"]["io.modelcontextprotocol/clientCapabilities"] = Json::object_t{};
 
     Json resp = app.dispatchMcpJson(req);
 
@@ -1364,5 +1377,159 @@ TEST_SUITE("commands") {
         CHECK(probes["places"]["ok"].get<bool>() == true);
         CHECK(probes["routes"]["ok"].get<bool>() == true);
         CHECK(statusTransport.calls.size() == 3);
+    }
+
+    TEST_CASE("http transport, server/discover, tools/list, CLI, and config fallback") {
+        struct LoopbackFd {
+            int fd{-1};
+            ~LoopbackFd() { if (fd >= 0) ::close(fd); }
+            LoopbackFd(const LoopbackFd&) = delete;
+            LoopbackFd& operator=(const LoopbackFd&) = delete;
+            LoopbackFd() = default;
+        };
+
+        auto postMcp = [](uint16_t port, std::string_view method, std::string_view body,
+                          std::string_view toolName = {}) -> std::pair<int, Json> {
+            LoopbackFd sock;
+            sock.fd = ::socket(AF_INET, SOCK_STREAM, 0);
+            REQUIRE(sock.fd >= 0);
+
+            sockaddr_in addr{};
+            addr.sin_family = AF_INET;
+            addr.sin_port = htons(port);
+            REQUIRE(::inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr) == 1);
+            REQUIRE(::connect(sock.fd, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) == 0);
+
+            std::string req = "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:" + std::to_string(port) + "\r\n"
+                              "Content-Type: application/json\r\n"
+                              "Accept: application/json, text/event-stream\r\n"
+                              "MCP-Protocol-Version: 2026-07-28\r\n"
+                              "Mcp-Method: " + std::string(method) + "\r\n";
+            if (!toolName.empty()) {
+                req += "Mcp-Name: " + std::string(toolName) + "\r\n";
+            }
+            req += "Content-Length: " + std::to_string(body.size()) + "\r\nConnection: close\r\n\r\n";
+            req += body;
+
+            size_t sent = 0;
+            while (sent < req.size()) {
+                ssize_t n = ::send(sock.fd, req.data() + sent, req.size() - sent, 0);
+                REQUIRE(n > 0);
+                sent += static_cast<size_t>(n);
+            }
+
+            std::string raw;
+            char buf[4096];
+            for (;;) {
+                pollfd pfd{sock.fd, POLLIN, 0};
+                REQUIRE(::poll(&pfd, 1, 5000) > 0);
+                ssize_t n = ::recv(sock.fd, buf, sizeof(buf), 0);
+                if (n <= 0) break;
+                raw.append(buf, static_cast<size_t>(n));
+            }
+
+            auto hdrEnd = raw.find("\r\n\r\n");
+            REQUIRE(hdrEnd != std::string::npos);
+            auto statusStart = raw.find(' ');
+            REQUIRE(statusStart != std::string::npos);
+            int status = std::stoi(raw.substr(statusStart + 1, 3));
+            std::string payload = raw.substr(hdrEnd + 4);
+            if (payload.empty()) return {status, Json()};
+            auto parsed = slimr::parse_json(payload);
+            REQUIRE(parsed.has_value());
+            return {status, std::move(*parsed)};
+        };
+
+        auto app = make_google_places_app(TEST_CONFIG);
+        slimr::enable_http(app, slimr::HttpServerOptions{.host = "127.0.0.1", .port = 8084});
+
+        // Guarded CLI invocation without HTTP flag
+        {
+            char arg0[] = "google-places-mcp";
+            char arg1[] = "status";
+            char* argv[] = {arg0, arg1, nullptr};
+            CHECK(app.run(2, argv) == 0);
+        }
+
+        // Non-loopback and unflagged ephemeral port refusals
+        {
+            char arg0[] = "google-places-mcp";
+            char arg1[] = "http";
+            char arg2[] = "--host";
+            char arg3[] = "0.0.0.0";
+            char* argv[] = {arg0, arg1, arg2, arg3, nullptr};
+            CHECK(app.run(4, argv) == 1);
+        }
+        {
+            char arg0[] = "google-places-mcp";
+            char arg1[] = "http";
+            char arg2[] = "--port";
+            char arg3[] = "0";
+            char* argv[] = {arg0, arg1, arg2, arg3, nullptr};
+            CHECK(app.run(4, argv) == 1);
+        }
+
+        // Ephemeral HTTP server roundtrip
+        slimr::McpHttpServer server(app, slimr::HttpServerOptions{
+            .host = "127.0.0.1",
+            .port = 0,
+            .allowEphemeralPort = true,
+        });
+        std::string err;
+        REQUIRE(server.start(&err));
+        const uint16_t port = server.boundPort();
+        CHECK(port > 0);
+
+        constexpr std::string_view kMeta =
+            R"("_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}})";
+
+        auto [discStatus, disc] = postMcp(
+            port, "server/discover",
+            std::string(R"({"jsonrpc":"2.0","id":1,"method":"server/discover","params":{)") +
+                std::string(kMeta) + "}}");
+        CHECK(discStatus == 200);
+        CHECK(disc["result"]["supportedVersions"][0].get<std::string>() == "2026-07-28");
+        CHECK(disc["result"]["_meta"]["io.modelcontextprotocol/serverInfo"]["name"].get<std::string>() == "google-places-mcp");
+
+        auto [listStatus, listed] = postMcp(
+            port, "tools/list",
+            std::string(R"({"jsonrpc":"2.0","id":2,"method":"tools/list","params":{)") +
+                std::string(kMeta) + "}}");
+        CHECK(listStatus == 200);
+        std::set<std::string> names;
+        for (const auto& t : listed["result"]["tools"].get<Json::array_t>()) {
+            names.insert(t["name"].get<std::string>());
+        }
+        CHECK(names == std::set<std::string>{
+            "search", "nearby", "details", "resolve", "geocode", "route", "matrix", "photo", "status"});
+
+        auto [callStatus, called] = postMcp(
+            port, "tools/call",
+            std::string(R"({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"status","arguments":{},)") +
+                std::string(kMeta) + "}}",
+            "status");
+        CHECK(callStatus == 200);
+        CHECK((!called["result"].contains("isError") || !called["result"]["isError"].get<bool>()));
+
+        auto [initStatus, initResp] = postMcp(
+            port, "initialize",
+            R"({"jsonrpc":"2.0","id":4,"method":"initialize","params":{}})");
+        CHECK(initStatus == 404);
+        CHECK(initResp["error"]["code"].get<int64_t>() == -32601);
+
+        server.stop();
+
+        // Optional JSON config file overrides for LaunchAgent / brew services
+        const auto cfgPath = std::filesystem::temp_directory_path() / "google-places-test-config.json";
+        {
+            std::ofstream out(cfgPath);
+            out << R"({"apiKey":"file-key-999","region":"gb","language":"en-GB"})";
+        }
+        auto fileOverrides = loadConfigFileOverrides(cfgPath);
+        std::error_code ec;
+        std::filesystem::remove(cfgPath, ec);
+        CHECK(fileOverrides["GOOGLE_PLACES_API_KEY"] == "file-key-999");
+        CHECK(fileOverrides["PLACES_REGION"] == "gb");
+        CHECK(fileOverrides["PLACES_LANGUAGE"] == "en-GB");
     }
 }

@@ -1,0 +1,14 @@
+{
+  "name": "bdombro-google-places-mcp",
+  "owner": {
+    "name": "Brian Dombrowski",
+    "email": "bdombro@users.noreply.github.com"
+  },
+  "plugins": [
+    {
+      "name": "google-places-mcp",
+      "source": "./",
+      "description": "Google Places, Routes, and Geocoding MCP server (Pro tier and below)"
+    }
+  ]
+}

@@ -1,10 +1,13 @@
 #pragma once
 
 #include "types.hpp"
+#include "json.hpp"
 
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <map>
 #include <mutex>
 #include <numbers>
@@ -378,10 +381,61 @@ inline PlacesConfig readConfigWith(Getter&& get) {
     };
 }
 
+inline std::filesystem::path defaultConfigPath() {
+    if (const char* explicitPath = std::getenv("GOOGLE_PLACES_CONFIG"); explicitPath && *explicitPath) {
+        return std::filesystem::path(explicitPath);
+    }
+    if (const char* xdg = std::getenv("XDG_CONFIG_HOME"); xdg && *xdg) {
+        return std::filesystem::path(xdg) / "google-places" / "config.json";
+    }
+    if (const char* home = std::getenv("HOME"); home && *home) {
+        return std::filesystem::path(home) / ".config" / "google-places" / "config.json";
+    }
+    return {};
+}
+
+/// Loads optional string config overrides from a JSON object file when present.
+inline std::map<std::string, std::string> loadConfigFileOverrides(const std::filesystem::path& path) {
+    std::map<std::string, std::string> out;
+    if (path.empty()) return out;
+
+    std::error_code ec;
+    if (!std::filesystem::exists(path, ec) || ec) return out;
+
+    std::ifstream in(path, std::ios::binary);
+    if (!in) return out;
+
+    std::ostringstream ss;
+    ss << in.rdbuf();
+    auto parsed = slimr::parse_json(ss.str());
+    if (!parsed || !parsed->is_object()) return out;
+
+    auto readAlias = [&](const char* envKey, const char* camelKey) {
+        for (const char* k : {envKey, camelKey}) {
+            if (!k) continue;
+            if (parsed->contains(k) && (*parsed)[k].is_string()) {
+                out[envKey] = (*parsed)[k].get<std::string>();
+                return;
+            }
+        }
+    };
+    readAlias("GOOGLE_PLACES_API_KEY", "apiKey");
+    readAlias("GOOGLE_PLACE_API_KEY", nullptr);
+    readAlias("PLACES_HOME", "home");
+    readAlias("PLACES_REGION", "region");
+    readAlias("PLACES_LANGUAGE", "language");
+    readAlias("PLACES_TIMEZONE", "timeZone");
+    return out;
+}
+
 inline PlacesConfig readConfig() {
-    return readConfigWith([](const std::string& key) -> std::string {
-        const char* v = std::getenv(key.c_str());
-        return v ? std::string(v) : "";
+    const auto fileOverrides = loadConfigFileOverrides(defaultConfigPath());
+    return readConfigWith([&](const std::string& key) -> std::string {
+        if (const char* v = std::getenv(key.c_str()); v && *v) {
+            return std::string(v);
+        }
+        auto it = fileOverrides.find(key);
+        return (it != fileOverrides.end()) ? it->second : "";
     });
 }
 
