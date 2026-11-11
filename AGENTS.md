@@ -4,6 +4,14 @@ Written for: AI coding agents working in the `google-places-mcp` C++26 plugin re
 
 `google-places-mcp` is a C++26 MCP plugin and CLI built on `slimr-cpp` wrapping the Google Places API (New), Routes API v2, and Geocoding API over `libcurl`, strictly locked to **Pro tier and below**.
 
+
+## Documentation Upkeep
+
+When a change conflicts with `README.md`, update the affected README and its
+linked user/developer documentation in the same change. Keep examples,
+configuration, install/build commands and compatibility claims consistent
+with implemented behavior; do not claim unverified release or client support.
+
 ## Commands
 
 | Task | Command |
@@ -11,7 +19,7 @@ Written for: AI coding agents working in the `google-places-mcp` C++26 plugin re
 | Run unit & mock-HTTP tests (ASan + UBSan, no network) | `just test` |
 | Build and test release binary (`build/bin/google-places-mcp`) | `just build` |
 | Analyze app and test translation units | `just lint` |
-| Verify isolated MCP initialization and tool discovery | `just test-mcp` |
+| Verify isolated July MCP discovery over stdio and ephemeral HTTP | `just test-mcp` |
 | Clean build artifacts | `just clean` |
 
 ## Module Boundaries

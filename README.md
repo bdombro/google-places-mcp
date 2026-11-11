@@ -13,6 +13,18 @@ Use this MCP to find places, compare nearby options, check routes and travel tim
 
 Every Places request is restricted to Google's **Pro tier and below**, so agent searches cannot trigger Enterprise-tier per-request billing. Place photos can be returned as native MCP images, ready for the agent to inspect.
 
+> **Client compatibility:** MCP **2026-07-28 only**; legacy clients cannot connect.
+> The workspace has been exercised with OpenCode v2.2.6 using explicit July
+> configuration. Cursor's July support is deferred; Claude Code July runtime
+> acceptance is not yet verified. Shipping a plugin manifest is not proof of
+> client compatibility.
+
+## Try It
+
+After setup, ask your agent:
+
+> Find nearby pharmacies and compare driving times from home.
+
 ## Features
 
 - Search and resolve places, inspect details, geocode addresses, and fetch photos.
@@ -20,22 +32,25 @@ Every Places request is restricted to Google's **Pro tier and below**, so agent 
 - Pro-tier field masks keep Place requests below Enterprise billing.
 - Small footprint: a standalone MCP binary with no Node/V8 runtime.
 
-## HTTP & Client Configuration (MCP `2026-07-28`)
+## Installation
 
-`google-places-mcp` defaults to HTTP-first Streamable HTTP on `http://127.0.0.1:8084/mcp` (`google-places-mcp http`) while preserving stdio (`google-places-mcp mcp`) and direct JSON CLI invocation (`google-places-mcp <tool> ['{...}']`).
+- **Prebuilt release:** the checked-in [Homebrew formula](Formula/google-places-mcp.rb)
+  currently has a placeholder checksum. It is not a ready-to-install release.
+  Check [releases](https://github.com/bdombro/google-places-mcp/releases) for published
+  binaries and a finalized formula before using a release installation command.
+- **Build from source:** the current path is [Development](#development).
+  Local slimr overlays are for development, not a runtime requirement.
+- **Already installed:** follow the setup and service steps below. Installing a
+  Cursor/Claude manifest only configures an endpoint; it does not install or
+  start the native service.
 
-> **Breaking change (MCP `2026-07-28`):** Legacy `initialize` / `notifications/initialized` session handshakes are replaced by stateless `server/discover` with `MCP-Protocol-Version: 2026-07-28` and `Mcp-Method` headers (legacy `initialize` returns `-32601`). Non-loopback bindings require `--allow-non-loopback`, and `--port 0` requires `--allow-ephemeral-port`.
 
-### Homebrew Service (`http://127.0.0.1:8084/mcp`)
+## Configure Google Maps
 
-```bash
-just install-local   # or: brew tap bdombro/google-places-mcp && brew install bdombro/google-places-mcp/google-places-mcp
-just start           # starts LaunchAgent service on 127.0.0.1:8084 and verifies server/discover
-just status          # checks brew services info + HTTP server/discover
-just stop            # stops LaunchAgent service
-```
-
-Because macOS `brew services` LaunchAgents do not inherit interactive shell environment variables, store your API key and defaults in `~/.config/google-places/config.json` (or `GOOGLE_PLACES_CONFIG`):
+Create a Google Cloud API key authorized for Places API (New), Routes API and
+Geocoding API. No Google Workspace CLI or user OAuth profile is needed.
+For a Homebrew service, store private settings in
+`~/.config/google-places/config.json` (or use `GOOGLE_PLACES_CONFIG`):
 
 ```json
 {
@@ -47,111 +62,53 @@ Because macOS `brew services` LaunchAgents do not inherit interactive shell envi
 }
 ```
 
-Environment variables (`GOOGLE_PLACES_API_KEY`, `PLACES_*`) still take precedence over `config.json`. You can also populate `config.json` from macOS Keychain during setup rather than embedding keys in Homebrew formulas or manifests.
+Restrict the file to your user (`chmod 600`) and never commit it.
+Environment variables override file values. The `home` value is optional
+configuration for location-biased searches; use your own location.
 
-### Client Config Spellings
 
-**Claude Code / `.mcp.json` (HTTP — requires `"type": "http"`):**
+## Start and Manage the Service
 
-```json
-{
-  "mcpServers": {
-    "google-places-mcp": {
-      "type": "http",
-      "url": "http://127.0.0.1:8084/mcp"
-    }
-  }
-}
+For an already-installed Homebrew formula:
+
+```bash
+brew services start bdombro/google-places-mcp/google-places-mcp
+brew services info google-places-mcp
+brew services restart bdombro/google-places-mcp/google-places-mcp
+brew services stop bdombro/google-places-mcp/google-places-mcp
 ```
 
-**Cursor (`.cursor/mcp.json` or `.cursor-plugin/plugin.json`):**
+The endpoint is `http://127.0.0.1:8084/mcp`; logs are under
+`/opt/homebrew/var/log/`. To run in the foreground instead, use
+`google-places-mcp http` (or `./build/bin/google-places-mcp http` from a source checkout).
+Do not run the foreground server and service on the same port.
+Keep the default loopback bind; this is not a shared remote-host deployment.
 
-```json
-{
-  "mcpServers": {
-    "google-places-mcp": {
-      "url": "http://127.0.0.1:8084/mcp"
-    }
-  }
-}
-```
 
-**OpenCode (`opencode.jsonc` — uses `"type": "remote"`):**
+## Connect Your Agent
+
+After starting the service, add this server to OpenCode v2.2.6's
+`opencode.jsonc` (merge it with any existing servers):
 
 ```json
 {
   "mcp": {
-    "google-places-mcp": {
-      "type": "remote",
-      "url": "http://127.0.0.1:8084/mcp"
-    }
-  }
-}
-```
-
-**Standalone stdio (`.mcp.json` fallback):**
-
-```json
-{
-  "mcpServers": {
-    "google-places-mcp": {
-      "command": "/absolute/path/to/build/bin/google-places-mcp",
-      "args": ["mcp"],
-      "env": {
-        "GOOGLE_PLACES_API_KEY": "${GOOGLE_PLACES_API_KEY}",
-        "PLACES_HOME": "53.3813,-6.5918",
-        "PLACES_REGION": "ie",
-        "PLACES_LANGUAGE": "en",
-        "PLACES_TIMEZONE": "Europe/Dublin"
+    "servers": {
+      "google-places-mcp": {
+        "type": "remote",
+        "url": "http://127.0.0.1:8084/mcp",
+        "protocol": "2026-07-28"
       }
     }
   }
 }
 ```
 
-## App Architecture
+Use either an explicit server entry or a plugin manifest, not both.
+Alternative client schemas and stdio configuration are in the
+[developer reference](docs/development.md). The compatibility notice above
+applies to every transport.
 
-The standalone MCP and JSON CLI are implemented in C++26 on `slimr-cpp`.
-
-```text
-plugins/google-places-mcp/
-├── vcpkg.json                # Independently resolved dependencies
-├── CMakeLists.txt            # App/test targets and transitive dependency linking
-├── justfile                  # Thin CMake/Ninja orchestration
-├── README.md                 # User & operator documentation
-├── AGENTS.md                 # Maintainer & AI agent conventions
-├── src/
-│   ├── types.hpp             # Core types (`LatLng`, `DEFAULT_HOME`, `PlacesConfig`)
-│   ├── util.hpp              # Haversine distance, duration formatting, `resolveTime`, `cleanText`, Base64
-│   ├── google_client.hpp     # Injectable `HttpTransport` over `curl.hpp`, key scrubber, failure classifier
-│   ├── places.hpp            # Places API v1 (`search`, `nearby`, `details`, `photo`) with Pro-tier field masks
-│   ├── geocode.hpp           # Geocoding API (forward and reverse geocoding)
-│   ├── routes.hpp            # Routes API v2 (`computeRoutes` and `computeRouteMatrix`)
-│   ├── app.hpp               # `make_google_places_app()` registering all 9 tools, annotations & Bugsink DSN
-│   └── main.cpp              # Standalone CLI, stdio MCP, and Streamable HTTP (`127.0.0.1:8084`) entrypoint
-├── Formula/
-│   └── google-places-mcp.rb  # Homebrew formula + LaunchAgent service
-├── scripts/
-│   ├── homebrew.mjs          # Local formula staging & brew services lifecycle
-│   └── test-mcp.mjs          # Stdio + ephemeral HTTP (`2026-07-28`) smoke check
-├── .cursor-plugin/
-│   └── plugin.json           # Cursor plugin manifest -> http://127.0.0.1:8084/mcp
-├── .claude-plugin/
-│   ├── plugin.json           # Claude plugin manifest -> http://127.0.0.1:8084/mcp
-│   └── marketplace.json      # Claude plugin marketplace descriptor
-├── tests/
-│   └── test_main.cpp         # Unit, mock-transport, CLI, and HTTP loopback tests (zero network calls)
-└── build/bin/
-    └── google-places-mcp     # Standalone release binary
-```
-
-### Libraries Used
-
-- **`<mcp.hpp>`, `<mcp_http.hpp>` & `<reflect.hpp>`:** Typed MCP tool definitions, compile-time JSON Schema generation, native MCP `McpResult::image(...)` blocks, HTTP (`2026-07-28`), and narrow JSON CLI.
-- **`<curl.hpp>` (`-lcurl`):** HTTPS requests to `places.googleapis.com`, `routes.googleapis.com`, and `maps.googleapis.com`.
-- **`<json.hpp>` (`glaze`):** RFC-8259 JSON serialization and parsing.
-- **`<bugsink.hpp>` (`-lcurl`):** opt-in error reporting through `BUGSINK_DSN`.
-- **`<test.hpp>` (`doctest`):** Mock-HTTP unit test suite compiled with `-fsanitize=address,undefined`.
 
 ## Tools & CLI Commands
 
@@ -222,6 +179,35 @@ Google bills Places API (New) requests according to the highest-tier field prese
 | `PLACES_TIMEZONE` | `Europe/Dublin` | IANA timezone for local `departAt` / `arriveBy` timestamps |
 | `BUGSINK_DSN` | unset (disabled) | Error reporting DSN (`""` disables) |
 
+## Troubleshooting
+
+- **Client cannot connect:** confirm it supports July MCP, the service is
+  running, and the client URL matches the configured port. OpenCode needs
+  `"protocol": "2026-07-28"`; old `initialize` clients will fail.
+- **Port occupied:** inspect the listener and stop only the service/process
+  you own, or deliberately choose another port and update the client URL.
+- **Works in a terminal, not as a service:** launchd does not inherit
+  `~/.zshrc`. Configure the service environment separately or use the
+  plugin's supported private configuration file; inspect
+  `/opt/homebrew/var/log/` for errors.
+- **Google rejects a request:** check API enablement, billing and key restrictions. Never paste your API key into logs or support reports.
+- **Source build cannot find vcpkg or slimr ports:** load the development
+  environment, bootstrap vcpkg, and register both slimr links and the pinned
+  libhv overlay. Never repair this by editing installed headers.
+- **Compiler/hardening check fails:** upgrade the Xcode toolchain; set
+  `CXX` before first configure. CMake caches the compiler, so an intentional
+  compiler change needs a fresh configuration tree.
+
+
+## Development
+
+This section is for building or changing the server, not configuring an
+installed binary. [Architecture, transport reference and test details](docs/development.md)
+are separate from the user setup flow.
+
+<details>
+<summary>macOS source-build setup (vcpkg and local slimr overlays)</summary>
+
 ## macOS Build Prerequisites (vcpkg setup)
 
 Install [Homebrew](https://brew.sh) and current Xcode Command Line Tools
@@ -287,21 +273,14 @@ package registry baselines pin resolution separately.
 Live requests require the API key described above, not the `gws` CLI.
 Build/test commands do not call Google APIs or start services.
 
-## Building & Testing
+</details>
 
-Use Clang with C++26 and libc++ FAST hardening, CMake 3.31+, Ninja, [just](https://just.systems), a bootstrapped [vcpkg](https://vcpkg.io), Node for Inspector, and a compatible clang-tidy (LLVM 23 locally). Set `VCPKG_ROOT` and put vcpkg and the tools on `PATH`. Linux additionally needs libc++ and libc++abi; select libc++ with `CXXFLAGS=-stdlib=libc++`.
-
-Dependencies are declared in `vcpkg.json`. During local development, `(cd /absolute/path/to/slimr-cpp && just publish --local --all)` publishes ports into vcpkg's local overlay; export `VCPKG_OVERLAY_PORTS="$VCPKG_ROOT/local-ports"` in your shell. `just deps` installs into `build/deps/` for the detected native triplet. `configure` always runs it, with CMake manifest installation disabled. CMake links installed `slimr::mcp` and `slimr::test` targets, never source-header overrides.
+After the source build succeeds, stage and install the local Homebrew formula:
 
 ```bash
-just test      # Debug ASan/UBSan mock-transport, CLI, and HTTP loopback tests (no network/quota)
-just build     # Optimized IPO Release app and tests; build/bin/google-places-mcp
-just lint      # App and test translation units using the Debug compilation database (supports CLANG_TIDY)
-just test-mcp  # Verify stdio (mcp) and ephemeral HTTP (http --port 0 --allow-ephemeral-port) against MCP 2026-07-28
-just run status
-just clean     # Remove build/ and Formula/.staging/ only; leaves user data untouched
+just install-local
 ```
 
-Debug and Release graphs live in `build/cmake/Debug/` and `build/cmake/Release/`; only Release apps are emitted to `build/bin/`. Set `CXX` before the first configure to choose a compiler; CMake retains its absolute path even when lint uses a different `PATH`. Both configurations enable libc++ hardening and zero automatic-variable initialization; Debug uses fatal UBSan reports. `just test` and `just test-mcp` isolate HOME/XDG directories, clear credentials, disable error reporting (`BUGSINK_DSN=""`), and never call Google APIs.
-
-CI runs the same commands on native Linux/macOS. Configure `VCPKG_REF` to the tested full vcpkg commit SHA; slimr packages resolve from the public registry pinned in `vcpkg-configuration.json`, without a dependency token. Local macOS validation is not Linux execution evidence.
+Installing a formula and starting its service are separate actions.
+For a source-only foreground run, use
+`./build/bin/google-places-mcp http`.
