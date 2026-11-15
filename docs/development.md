@@ -29,16 +29,16 @@ plugins/google-places-mcp/
 │   ├── geocode.hpp           # Geocoding API (forward and reverse geocoding)
 │   ├── routes.hpp            # Routes API v2 (`computeRoutes` and `computeRouteMatrix`)
 │   ├── app.hpp               # `make_google_places_app()` registering all 9 tools, annotations & Bugsink DSN
-│   └── main.cpp              # Standalone CLI, stdio MCP, and Streamable HTTP (`127.0.0.1:8084`) entrypoint
+│   └── main.cpp              # Standalone CLI, stdio MCP, and Streamable HTTP (`127.0.0.1:10004`) entrypoint
 ├── Formula/
 │   └── google-places-mcp.rb  # Homebrew formula + LaunchAgent service
 ├── scripts/
 │   ├── homebrew.mjs          # Local formula staging & brew services lifecycle
 │   └── test-mcp.mjs          # Stdio + ephemeral HTTP (`2026-07-28`) smoke check
 ├── .cursor-plugin/
-│   └── plugin.json           # Cursor plugin manifest -> http://127.0.0.1:8084/mcp
+│   └── plugin.json           # Cursor plugin manifest -> http://127.0.0.1:10004/mcp
 ├── .claude-plugin/
-│   ├── plugin.json           # Claude plugin manifest -> http://127.0.0.1:8084/mcp
+│   ├── plugin.json           # Claude plugin manifest -> http://127.0.0.1:10004/mcp
 │   └── marketplace.json      # Claude plugin marketplace descriptor
 ├── tests/
 │   └── test_main.cpp         # Unit, mock-transport, CLI, and HTTP loopback tests (zero network calls)
@@ -56,15 +56,15 @@ plugins/google-places-mcp/
 
 ## HTTP & Client Configuration (MCP `2026-07-28`)
 
-`google-places-mcp` defaults to HTTP-first Streamable HTTP on `http://127.0.0.1:8084/mcp` (`google-places-mcp http`) while preserving stdio (`google-places-mcp mcp`) and direct JSON CLI invocation (`google-places-mcp <tool> ['{...}']`).
+`google-places-mcp` defaults to HTTP-first Streamable HTTP on `http://127.0.0.1:10004/mcp` (`google-places-mcp http`) while preserving stdio (`google-places-mcp mcp`) and direct JSON CLI invocation (`google-places-mcp <tool> ['{...}']`).
 
 > **Breaking change (MCP `2026-07-28`):** Legacy `initialize` / `notifications/initialized` session handshakes are replaced by stateless `server/discover` with `MCP-Protocol-Version: 2026-07-28` and `Mcp-Method` headers (legacy `initialize` returns `-32601`). Non-loopback bindings require `--allow-non-loopback`, and `--port 0` requires `--allow-ephemeral-port`.
 
-### Homebrew Service (`http://127.0.0.1:8084/mcp`)
+### Homebrew Service (`http://127.0.0.1:10004/mcp`)
 
 ```bash
 just install-local   # Local source-build installation; the release formula is not finalized
-just start           # starts LaunchAgent service on 127.0.0.1:8084 and verifies server/discover
+just start           # starts LaunchAgent service on 127.0.0.1:10004 and verifies server/discover
 just status          # checks brew services info + HTTP server/discover
 just stop            # stops LaunchAgent service
 ```
@@ -92,7 +92,7 @@ Environment variables (`GOOGLE_PLACES_API_KEY`, `PLACES_*`) still take precedenc
   "mcpServers": {
     "google-places-mcp": {
       "type": "http",
-      "url": "http://127.0.0.1:8084/mcp"
+      "url": "http://127.0.0.1:10004/mcp"
     }
   }
 }
@@ -104,7 +104,7 @@ Environment variables (`GOOGLE_PLACES_API_KEY`, `PLACES_*`) still take precedenc
 {
   "mcpServers": {
     "google-places-mcp": {
-      "url": "http://127.0.0.1:8084/mcp"
+      "url": "http://127.0.0.1:10004/mcp"
     }
   }
 }
@@ -118,7 +118,7 @@ Environment variables (`GOOGLE_PLACES_API_KEY`, `PLACES_*`) still take precedenc
     "servers": {
       "google-places-mcp": {
       "type": "remote",
-      "url": "http://127.0.0.1:8084/mcp",
+      "url": "http://127.0.0.1:10004/mcp",
         "protocol": "2026-07-28"
       }
     }

@@ -78,7 +78,7 @@ brew services restart bdombro/google-places-mcp/google-places-mcp
 brew services stop bdombro/google-places-mcp/google-places-mcp
 ```
 
-The endpoint is `http://127.0.0.1:8084/mcp`; logs are under
+The endpoint is `http://127.0.0.1:10004/mcp`; logs are under
 `/opt/homebrew/var/log/`. To run in the foreground instead, use
 `google-places-mcp http` (or `./build/bin/google-places-mcp http` from a source checkout).
 Do not run the foreground server and service on the same port.
@@ -96,7 +96,7 @@ After starting the service, add this server to OpenCode v2.2.6's
     "servers": {
       "google-places-mcp": {
         "type": "remote",
-        "url": "http://127.0.0.1:8084/mcp",
+        "url": "http://127.0.0.1:10004/mcp",
         "protocol": "2026-07-28"
       }
     }
@@ -112,7 +112,7 @@ applies to every transport.
 
 ## Tools & CLI Commands
 
-Every tool is available over MCP (`google-places-mcp http` on `http://127.0.0.1:8084/mcp`, `google-places-mcp mcp` over stdio) and on the CLI (`google-places-mcp <tool> ['{"arg":"val"}']`).
+Every tool is available over MCP (`google-places-mcp http` on `http://127.0.0.1:10004/mcp`, `google-places-mcp mcp` over stdio) and on the CLI (`google-places-mcp <tool> ['{"arg":"val"}']`).
 
 | Tool | Google API | Description |
 | --- | --- | --- |

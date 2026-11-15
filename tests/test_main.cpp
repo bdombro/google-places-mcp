@@ -1441,7 +1441,7 @@ TEST_SUITE("commands") {
         };
 
         auto app = make_google_places_app(TEST_CONFIG);
-        slimr::enable_http(app, slimr::HttpServerOptions{.host = "127.0.0.1", .port = 8084});
+        slimr::enable_http(app, slimr::HttpServerOptions{.host = "127.0.0.1", .port = 10004});
 
         // Guarded CLI invocation without HTTP flag
         {

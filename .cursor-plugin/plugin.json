@@ -10,7 +10,7 @@
   "license": "MIT",
   "mcpServers": {
     "google-places-mcp": {
-      "url": "http://127.0.0.1:8084/mcp"
+      "url": "http://127.0.0.1:10004/mcp"
     }
   }
 }

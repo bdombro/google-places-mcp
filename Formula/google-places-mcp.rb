@@ -12,7 +12,7 @@ class GooglePlacesMcp < Formula
   end
 
   service do
-    run [opt_bin/"google-places-mcp", "http", "--host", "127.0.0.1", "--port", "8084"]
+    run [opt_bin/"google-places-mcp", "http", "--host", "127.0.0.1", "--port", "10004"]
     keep_alive true
     log_path var/"log/google-places-mcp.log"
     error_log_path var/"log/google-places-mcp.log"
@@ -21,7 +21,7 @@ class GooglePlacesMcp < Formula
   def caveats
     <<~EOS
       HTTP MCP endpoint:
-        http://127.0.0.1:8084/mcp
+        http://127.0.0.1:10004/mcp
 
       Configure your Google Maps API key for the LaunchAgent in:
         ~/.config/google-places/config.json
