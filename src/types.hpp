@@ -12,7 +12,7 @@ struct LatLng {
     double lat = 0.0;
     double lng = 0.0;
 
-    bool operator==(const LatLng& other) const = default;
+    bool operator==(const LatLng &other) const = default;
 };
 
 inline constexpr LatLng DEFAULT_HOME{53.3813, -6.5918};

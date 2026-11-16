@@ -1,9 +1,9 @@
 #pragma once
 
 #include "google_client.hpp"
+#include "json.hpp"
 #include "types.hpp"
 #include "util.hpp"
-#include "json.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -30,13 +30,20 @@ struct PlaceOut {
         slimr::Json j = slimr::Json::object_t{};
         j["id"] = id;
         j["name"] = name;
-        if (address) j["address"] = *address;
-        if (lat) j["lat"] = *lat;
-        if (lng) j["lng"] = *lng;
-        if (type) j["type"] = *type;
-        if (status) j["status"] = *status;
-        if (mapsUrl) j["mapsUrl"] = *mapsUrl;
-        if (distanceM) j["distanceM"] = *distanceM;
+        if (address)
+            j["address"] = *address;
+        if (lat)
+            j["lat"] = *lat;
+        if (lng)
+            j["lng"] = *lng;
+        if (type)
+            j["type"] = *type;
+        if (status)
+            j["status"] = *status;
+        if (mapsUrl)
+            j["mapsUrl"] = *mapsUrl;
+        if (distanceM)
+            j["distanceM"] = *distanceM;
         return j;
     }
 };
@@ -53,7 +60,7 @@ struct PlacesOut {
         j["center"]["lat"] = center.lat;
         j["center"]["lng"] = center.lng;
         slimr::Json::array_t arr;
-        for (const auto& p : places) {
+        for (const auto &p : places) {
             arr.push_back(p.toJson());
         }
         j["places"] = arr;
@@ -62,25 +69,32 @@ struct PlacesOut {
     }
 };
 
-inline std::string placesText(const PlacesOut& out) {
-    if (out.places.empty()) return "No places found near " + out.near + ".";
+inline std::string placesText(const PlacesOut &out) {
+    if (out.places.empty())
+        return "No places found near " + out.near + ".";
     std::string res = "Near " + out.near + ":";
     for (size_t i = 0; i < out.places.size(); ++i) {
-        const auto& p = out.places[i];
+        const auto &p = out.places[i];
         std::vector<std::string> bits;
-        if (p.type) bits.push_back(*p.type);
-        if (p.distanceM) bits.push_back(formatDistance(*p.distanceM));
-        if (p.status) bits.push_back(*p.status);
+        if (p.type)
+            bits.push_back(*p.type);
+        if (p.distanceM)
+            bits.push_back(formatDistance(*p.distanceM));
+        if (p.status)
+            bits.push_back(*p.status);
 
         std::string bitsStr;
         for (size_t b = 0; b < bits.size(); ++b) {
-            if (b > 0) bitsStr += ", ";
+            if (b > 0)
+                bitsStr += ", ";
             bitsStr += bits[b];
         }
 
         res += "\n" + std::to_string(i + 1) + ". " + p.name;
-        if (p.address) res += " — " + *p.address;
-        if (!bitsStr.empty()) res += " (" + bitsStr + ")";
+        if (p.address)
+            res += " — " + *p.address;
+        if (!bitsStr.empty())
+            res += " (" + bitsStr + ")";
         res += "\n   " + p.id;
     }
     return res;
@@ -95,9 +109,12 @@ struct PhotoRef {
     slimr::Json toJson() const {
         slimr::Json j = slimr::Json::object_t{};
         j["name"] = name;
-        if (widthPx) j["widthPx"] = *widthPx;
-        if (heightPx) j["heightPx"] = *heightPx;
-        if (author) j["author"] = *author;
+        if (widthPx)
+            j["widthPx"] = *widthPx;
+        if (heightPx)
+            j["heightPx"] = *heightPx;
+        if (author)
+            j["author"] = *author;
         return j;
     }
 };
@@ -113,18 +130,22 @@ struct DetailsResult {
         slimr::Json p = base.toJson();
         if (!types.empty()) {
             slimr::Json::array_t arr;
-            for (const auto& t : types) arr.push_back(t);
+            for (const auto &t : types)
+                arr.push_back(t);
             p["types"] = arr;
         }
-        if (timeZone) p["timeZone"] = *timeZone;
+        if (timeZone)
+            p["timeZone"] = *timeZone;
         if (!accessibility.empty()) {
             slimr::Json::array_t arr;
-            for (const auto& a : accessibility) arr.push_back(a);
+            for (const auto &a : accessibility)
+                arr.push_back(a);
             p["accessibility"] = arr;
         }
         if (!photos.empty()) {
             slimr::Json::array_t arr;
-            for (const auto& ph : photos) arr.push_back(ph.toJson());
+            for (const auto &ph : photos)
+                arr.push_back(ph.toJson());
             p["photos"] = arr;
         }
 
@@ -141,10 +162,12 @@ struct Center {
     std::string label;
 };
 
-inline std::optional<PlaceOut> toPlace(const slimr::Json& raw, std::optional<LatLng> from = std::nullopt) {
-    if (!raw.contains("id") || !raw["id"].is_string()) return std::nullopt;
+inline std::optional<PlaceOut> toPlace(const slimr::Json &raw, std::optional<LatLng> from = std::nullopt) {
+    if (!raw.contains("id") || !raw["id"].is_string())
+        return std::nullopt;
     std::string id = raw["id"].get<std::string>();
-    if (id.empty()) return std::nullopt;
+    if (id.empty())
+        return std::nullopt;
 
     PlaceOut place;
     place.id = id;
@@ -158,11 +181,12 @@ inline std::optional<PlaceOut> toPlace(const slimr::Json& raw, std::optional<Lat
 
     if (raw.contains("formattedAddress") && raw["formattedAddress"].is_string()) {
         auto addr = cleanText(raw["formattedAddress"].get<std::string>(), 300);
-        if (addr) place.address = addr;
+        if (addr)
+            place.address = addr;
     }
 
     if (raw.contains("location") && raw["location"].is_object()) {
-        const auto& loc = raw["location"];
+        const auto &loc = raw["location"];
         if (loc.contains("latitude") && loc["latitude"].is_number() &&
             loc.contains("longitude") && loc["longitude"].is_number()) {
             double lat = loc["latitude"].get<double>();
@@ -178,7 +202,8 @@ inline std::optional<PlaceOut> toPlace(const slimr::Json& raw, std::optional<Lat
     if (raw.contains("primaryTypeDisplayName") && raw["primaryTypeDisplayName"].is_object() &&
         raw["primaryTypeDisplayName"].contains("text") && raw["primaryTypeDisplayName"]["text"].is_string()) {
         auto t = cleanText(raw["primaryTypeDisplayName"]["text"].get<std::string>(), 80);
-        if (t) place.type = t;
+        if (t)
+            place.type = t;
     }
 
     if (raw.contains("businessStatus") && raw["businessStatus"].is_string()) {
@@ -200,13 +225,15 @@ inline std::optional<PlaceOut> toPlace(const slimr::Json& raw, std::optional<Lat
 
 inline std::optional<std::string> asPlaceId(std::string_view text) {
     size_t s = text.find_first_not_of(" \t\r\n");
-    if (s == std::string_view::npos) return std::nullopt;
+    if (s == std::string_view::npos)
+        return std::nullopt;
     text = text.substr(s, text.find_last_not_of(" \t\r\n") - s + 1);
 
     if (text.starts_with("places/")) {
         text.remove_prefix(7);
     }
-    if (text.empty()) return std::nullopt;
+    if (text.empty())
+        return std::nullopt;
 
     for (char c : text) {
         if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-')) {
@@ -228,27 +255,30 @@ inline slimr::Json circle(LatLng center, double radiusM) {
     return j;
 }
 
-inline std::vector<PlaceOut> placesFrom(const slimr::Json& json, LatLng from) {
+inline std::vector<PlaceOut> placesFrom(const slimr::Json &json, LatLng from) {
     std::vector<PlaceOut> out;
     if (json.contains("places") && json["places"].is_array()) {
-        for (const auto& item : json["places"].get<slimr::Json::array_t>()) {
+        for (const auto &item : json["places"].get<slimr::Json::array_t>()) {
             auto p = toPlace(item, from);
-            if (p) out.push_back(std::move(*p));
+            if (p)
+                out.push_back(std::move(*p));
         }
     }
     return out;
 }
 
-inline Center resolveCenter(const PlacesConfig& config, HttpTransport transport, std::optional<std::string_view> near) {
+inline Center resolveCenter(const PlacesConfig &config, HttpTransport transport, std::optional<std::string_view> near) {
     std::string text;
     if (near) {
         std::string s(*near);
         size_t st = s.find_first_not_of(" \t\r\n");
-        if (st != std::string::npos) text = s.substr(st, s.find_last_not_of(" \t\r\n") - st + 1);
+        if (st != std::string::npos)
+            text = s.substr(st, s.find_last_not_of(" \t\r\n") - st + 1);
     }
 
     std::string lower = text;
-    for (char& c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    for (char &c : lower)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
     if (text.empty() || lower == "home") {
         return Center{.lat = config.home.lat, .lng = config.home.lng, .label = "home area"};
@@ -275,11 +305,11 @@ inline Center resolveCenter(const PlacesConfig& config, HttpTransport transport,
 
     auto json = request(config, transport, spec);
     if (json.contains("places") && json["places"].is_array()) {
-        const auto& arr = json["places"].get<slimr::Json::array_t>();
+        const auto &arr = json["places"].get<slimr::Json::array_t>();
         if (!arr.empty()) {
-            const auto& hit = arr[0];
+            const auto &hit = arr[0];
             if (hit.contains("location") && hit["location"].is_object()) {
-                const auto& loc = hit["location"];
+                const auto &loc = hit["location"];
                 if (loc.contains("latitude") && loc["latitude"].is_number() &&
                     loc.contains("longitude") && loc["longitude"].is_number()) {
                     double lat = loc["latitude"].get<double>();
@@ -299,7 +329,7 @@ inline Center resolveCenter(const PlacesConfig& config, HttpTransport transport,
     throw GoogleError("Couldn't find \"" + text + "\" to search near.");
 }
 
-inline std::string resolveId(const PlacesConfig& config, HttpTransport transport, std::string_view text, std::optional<std::string_view> near = std::nullopt) {
+inline std::string resolveId(const PlacesConfig &config, HttpTransport transport, std::string_view text, std::optional<std::string_view> near = std::nullopt) {
     auto center = resolveCenter(config, transport, near);
 
     RequestSpec spec;
@@ -316,9 +346,9 @@ inline std::string resolveId(const PlacesConfig& config, HttpTransport transport
 
     auto json = request(config, transport, spec);
     if (json.contains("places") && json["places"].is_array()) {
-        const auto& arr = json["places"].get<slimr::Json::array_t>();
+        const auto &arr = json["places"].get<slimr::Json::array_t>();
         if (!arr.empty()) {
-            const auto& hit = arr[0];
+            const auto &hit = arr[0];
             if (hit.contains("id") && hit["id"].is_string()) {
                 std::string id = hit["id"].get<std::string>();
                 static const std::regex idRegex("^[A-Za-z0-9_-]+$");
@@ -332,7 +362,7 @@ inline std::string resolveId(const PlacesConfig& config, HttpTransport transport
     throw GoogleError("No place found for \"" + std::string(text) + "\".");
 }
 
-inline DetailsResult placeDetails(const PlacesConfig& config, HttpTransport transport, std::string_view place, std::optional<std::string_view> near = std::nullopt, int64_t photos = 0) {
+inline DetailsResult placeDetails(const PlacesConfig &config, HttpTransport transport, std::string_view place, std::optional<std::string_view> near = std::nullopt, int64_t photos = 0) {
     std::string id;
     auto directId = asPlaceId(place);
     if (directId) {
@@ -355,7 +385,8 @@ inline DetailsResult placeDetails(const PlacesConfig& config, HttpTransport tran
     spec.fieldMask = fieldMask;
 
     auto raw = request(config, transport, spec);
-    if (!raw.contains("id")) raw["id"] = id;
+    if (!raw.contains("id"))
+        raw["id"] = id;
 
     auto base = toPlace(raw);
     if (!base) {
@@ -374,7 +405,7 @@ inline DetailsResult placeDetails(const PlacesConfig& config, HttpTransport tran
 
     if (raw.contains("types") && raw["types"].is_array()) {
         static const std::regex typeRegex("^[a-z0-9_]+$");
-        for (const auto& t : raw["types"].get<slimr::Json::array_t>()) {
+        for (const auto &t : raw["types"].get<slimr::Json::array_t>()) {
             if (t.is_string()) {
                 std::string tStr = t.get<std::string>();
                 if (std::regex_match(tStr, typeRegex)) {
@@ -390,7 +421,7 @@ inline DetailsResult placeDetails(const PlacesConfig& config, HttpTransport tran
     }
 
     if (raw.contains("accessibilityOptions") && raw["accessibilityOptions"].is_object()) {
-        for (const auto& [k, v] : raw["accessibilityOptions"].get<slimr::Json::object_t>()) {
+        for (const auto &[k, v] : raw["accessibilityOptions"].get<slimr::Json::object_t>()) {
             if (v.is_boolean() && v.get<bool>()) {
                 out.accessibility.push_back(k);
             }
@@ -399,17 +430,20 @@ inline DetailsResult placeDetails(const PlacesConfig& config, HttpTransport tran
 
     if (photos > 0 && raw.contains("photos") && raw["photos"].is_array()) {
         static const std::regex photoRegex(R"(^places/[A-Za-z0-9_-]+/photos/[A-Za-z0-9_-]+$)");
-        for (const auto& p : raw["photos"].get<slimr::Json::array_t>()) {
-            if (static_cast<int64_t>(out.photos.size()) >= photos) break;
+        for (const auto &p : raw["photos"].get<slimr::Json::array_t>()) {
+            if (static_cast<int64_t>(out.photos.size()) >= photos)
+                break;
             if (p.contains("name") && p["name"].is_string()) {
                 std::string pName = p["name"].get<std::string>();
                 if (std::regex_match(pName, photoRegex)) {
                     PhotoRef pref;
                     pref.name = std::move(pName);
-                    if (p.contains("widthPx") && p["widthPx"].is_number()) pref.widthPx = p["widthPx"].get<int64_t>();
-                    if (p.contains("heightPx") && p["heightPx"].is_number()) pref.heightPx = p["heightPx"].get<int64_t>();
+                    if (p.contains("widthPx") && p["widthPx"].is_number())
+                        pref.widthPx = p["widthPx"].get<int64_t>();
+                    if (p.contains("heightPx") && p["heightPx"].is_number())
+                        pref.heightPx = p["heightPx"].get<int64_t>();
                     if (p.contains("authorAttributions") && p["authorAttributions"].is_array()) {
-                        const auto& auths = p["authorAttributions"].get<slimr::Json::array_t>();
+                        const auto &auths = p["authorAttributions"].get<slimr::Json::array_t>();
                         if (!auths.empty() && auths[0].contains("displayName") && auths[0]["displayName"].is_string()) {
                             pref.author = cleanText(auths[0]["displayName"].get<std::string>(), 80);
                         }
@@ -423,7 +457,7 @@ inline DetailsResult placeDetails(const PlacesConfig& config, HttpTransport tran
     return out;
 }
 
-inline std::string photoUri(const PlacesConfig& config, HttpTransport transport, std::string_view name, int64_t maxWidthPx) {
+inline std::string photoUri(const PlacesConfig &config, HttpTransport transport, std::string_view name, int64_t maxWidthPx) {
     static const std::regex photoRegex(R"(^places/[A-Za-z0-9_-]+/photos/[A-Za-z0-9_-]+$)");
     std::string nameStr(name);
     if (!std::regex_match(nameStr, photoRegex)) {
@@ -446,15 +480,14 @@ inline std::string photoUri(const PlacesConfig& config, HttpTransport transport,
 }
 
 inline std::vector<PlaceOut> searchText(
-    const PlacesConfig& config,
+    const PlacesConfig &config,
     HttpTransport transport,
     std::string_view query,
     LatLng center,
     double radiusM,
     std::optional<std::string_view> type,
     std::string_view rank,
-    int64_t limit
-) {
+    int64_t limit) {
     RequestSpec spec;
     spec.api = "places";
     spec.method = "POST";
@@ -477,15 +510,14 @@ inline std::vector<PlaceOut> searchText(
 }
 
 inline std::vector<PlaceOut> searchNearby(
-    const PlacesConfig& config,
+    const PlacesConfig &config,
     HttpTransport transport,
     LatLng center,
     double radiusM,
-    const std::vector<std::string>& types,
-    const std::vector<std::string>& exclude,
+    const std::vector<std::string> &types,
+    const std::vector<std::string> &exclude,
     std::string_view rank,
-    int64_t limit
-) {
+    int64_t limit) {
     RequestSpec spec;
     spec.api = "places";
     spec.method = "POST";
@@ -494,12 +526,14 @@ inline std::vector<PlaceOut> searchNearby(
 
     spec.body = slimr::Json::object_t{};
     slimr::Json::array_t incArr;
-    for (const auto& t : types) incArr.push_back(t);
+    for (const auto &t : types)
+        incArr.push_back(t);
     spec.body["includedTypes"] = incArr;
 
     if (!exclude.empty()) {
         slimr::Json::array_t excArr;
-        for (const auto& e : exclude) excArr.push_back(e);
+        for (const auto &e : exclude)
+            excArr.push_back(e);
         spec.body["excludedTypes"] = excArr;
     }
 
@@ -514,12 +548,11 @@ inline std::vector<PlaceOut> searchNearby(
 }
 
 inline std::pair<Center, std::vector<PlaceOut>> resolvePlaces(
-    const PlacesConfig& config,
+    const PlacesConfig &config,
     HttpTransport transport,
     std::string_view text,
     std::optional<std::string_view> near = std::nullopt,
-    int64_t limit = 3
-) {
+    int64_t limit = 3) {
     auto center = resolveCenter(config, transport, near);
     auto places = searchText(config, transport, text, LatLng{center.lat, center.lng}, 20000, std::nullopt, "relevance", limit);
     return {std::move(center), std::move(places)};

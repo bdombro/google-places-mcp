@@ -1,8 +1,8 @@
 #define SLIMR_TEST_MAIN
-#include "test.hpp"
 #include "json.hpp"
 #include "mcp.hpp"
 #include "mcp_http.hpp"
+#include "test.hpp"
 
 #include "app.hpp"
 #include "geocode.hpp"
@@ -51,17 +51,18 @@ const Json RAW_PLACE = Json{
     {"googleMapsUri", "https://maps.google.com/?cid=1"},
 };
 
-inline HttpCallResponse jsonResponse(const Json& j, long status = 200) {
+inline HttpCallResponse jsonResponse(const Json &j, long status = 200) {
     return HttpCallResponse{.status = status, .body = slimr::write_json(j)};
 }
 
 struct RecordingTransport {
     std::vector<HttpCall> calls;
-    std::function<HttpCallResponse(const HttpCall&)> reply;
+    std::function<HttpCallResponse(const HttpCall &)> reply;
 
-    HttpCallResponse operator()(const HttpCall& call) {
+    HttpCallResponse operator()(const HttpCall &call) {
         calls.push_back(call);
-        if (reply) return reply(call);
+        if (reply)
+            return reply(call);
         return HttpCallResponse{.status = 200, .body = "{}"};
     }
 };
@@ -73,7 +74,7 @@ struct RunResult {
     std::vector<ContentBlock> content;
 };
 
-inline RunResult runTool(PluginApp& app, std::string_view toolName, const Json& args = Json::object_t{}) {
+inline RunResult runTool(PluginApp &app, std::string_view toolName, const Json &args = Json::object_t{}) {
     Json req = Json::object_t{};
     req["jsonrpc"] = "2.0";
     req["id"] = 1;
@@ -93,11 +94,11 @@ inline RunResult runTool(PluginApp& app, std::string_view toolName, const Json& 
     }
 
     if (resp.contains("result")) {
-        const auto& res = resp["result"];
+        const auto &res = resp["result"];
         r.isError = res.contains("isError") && res["isError"].get<bool>();
 
         if (res.contains("content") && res["content"].is_array()) {
-            for (const auto& b : res["content"].get<Json::array_t>()) {
+            for (const auto &b : res["content"].get<Json::array_t>()) {
                 ContentBlock cb;
                 cb.type = b["type"].get<std::string>();
                 if (cb.type == "text" && b.contains("text")) {
@@ -216,13 +217,11 @@ TEST_SUITE("util") {
         CHECK_THROWS_WITH_AS(
             resolveTime("2026-11-01T08:00", "Europe/Dublin", now),
             doctest::Contains("past"),
-            std::runtime_error
-        );
+            std::runtime_error);
         CHECK_THROWS_WITH_AS(
             resolveTime("tomorrow morning", "Europe/Dublin", now),
             doctest::Contains("Can't read the time"),
-            std::runtime_error
-        );
+            std::runtime_error);
     }
 }
 
@@ -233,7 +232,7 @@ TEST_SUITE("util") {
 TEST_SUITE("google_client") {
     TEST_CASE("sends the key in a header for Places and Routes, with the field mask") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             return HttpCallResponse{.status = 200, .body = "{}"};
         };
 
@@ -247,7 +246,7 @@ TEST_SUITE("google_client") {
         request(TEST_CONFIG, std::ref(transport), spec);
 
         CHECK(transport.calls.size() == 1);
-        const auto& call = transport.calls[0];
+        const auto &call = transport.calls[0];
         CHECK(call.url == "https://places.googleapis.com/v1/places:searchText");
         CHECK(call.headers.at("X-Goog-Api-Key") == TEST_CONFIG.apiKey);
         CHECK(call.headers.at("X-Goog-FieldMask") == "places.id");
@@ -256,7 +255,7 @@ TEST_SUITE("google_client") {
 
     TEST_CASE("sends the key as a query parameter for Geocoding") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             return HttpCallResponse{.status = 200, .body = R"({"status":"OK","results":[]})"};
         };
 
@@ -269,7 +268,7 @@ TEST_SUITE("google_client") {
         request(TEST_CONFIG, std::ref(transport), spec);
 
         CHECK(transport.calls.size() == 1);
-        const auto& call = transport.calls[0];
+        const auto &call = transport.calls[0];
         CHECK(call.url.find("key=" + TEST_CONFIG.apiKey) != std::string::npos);
         CHECK(call.url.find("address=Maynooth") != std::string::npos);
         CHECK(call.headers.find("X-Goog-Api-Key") == call.headers.end());
@@ -277,23 +276,18 @@ TEST_SUITE("google_client") {
 
     TEST_CASE("explains a disabled API and how to enable it") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             Json body = Json{
                 {"error", Json{
-                    {"code", 403},
-                    {"status", "PERMISSION_DENIED"},
-                    {"message", "Places API (New) has not been used in project 1 before or it is disabled."},
-                    {"details", Json::array_t{
-                        Json{
-                            {"reason", "SERVICE_DISABLED"},
-                            {"metadata", Json{
-                                {"serviceTitle", "Places API (New)"},
-                                {"activationUrl", "https://example.test/enable"}
-                            }}
-                        }
-                    }}
-                }}
-            };
+                              {"code", 403},
+                              {"status", "PERMISSION_DENIED"},
+                              {"message", "Places API (New) has not been used in project 1 before or it is disabled."},
+                              {"details", Json::array_t{
+                                              Json{
+                                                  {"reason", "SERVICE_DISABLED"},
+                                                  {"metadata", Json{
+                                                                   {"serviceTitle", "Places API (New)"},
+                                                                   {"activationUrl", "https://example.test/enable"}}}}}}}}};
             return jsonResponse(body, 403);
         };
 
@@ -306,7 +300,7 @@ TEST_SUITE("google_client") {
         bool caught = false;
         try {
             request(TEST_CONFIG, std::ref(transport), spec);
-        } catch (const GoogleError& e) {
+        } catch (const GoogleError &e) {
             caught = true;
             std::string msg = e.what();
             CHECK(msg.find("not enabled") != std::string::npos);
@@ -317,10 +311,9 @@ TEST_SUITE("google_client") {
 
     TEST_CASE("reports an invalid key, quota and other errors") {
         RecordingTransport bad;
-        bad.reply = [](const HttpCall&) {
+        bad.reply = [](const HttpCall &) {
             Json body = Json{
-                {"error", Json{{"message", "API key not valid. Please pass a valid API key."}}}
-            };
+                {"error", Json{{"message", "API key not valid. Please pass a valid API key."}}}};
             return jsonResponse(body, 400);
         };
 
@@ -331,14 +324,12 @@ TEST_SUITE("google_client") {
         CHECK_THROWS_WITH_AS(
             request(TEST_CONFIG, std::ref(bad), specBad),
             doctest::Contains("rejected the API key"),
-            GoogleError
-        );
+            GoogleError);
 
         RecordingTransport quota;
-        quota.reply = [](const HttpCall&) {
+        quota.reply = [](const HttpCall &) {
             Json body = Json{
-                {"error", Json{{"status", "RESOURCE_EXHAUSTED"}, {"message", "quota"}}}
-            };
+                {"error", Json{{"status", "RESOURCE_EXHAUSTED"}, {"message", "quota"}}}};
             return jsonResponse(body, 429);
         };
 
@@ -349,14 +340,12 @@ TEST_SUITE("google_client") {
         CHECK_THROWS_WITH_AS(
             request(TEST_CONFIG, std::ref(quota), specQuota),
             doctest::Contains("quota exceeded"),
-            GoogleError
-        );
+            GoogleError);
 
         RecordingTransport other;
-        other.reply = [](const HttpCall&) {
+        other.reply = [](const HttpCall &) {
             Json body = Json{
-                {"error", Json{{"status", "INTERNAL"}, {"message", "boom"}}}
-            };
+                {"error", Json{{"status", "INTERNAL"}, {"message", "boom"}}}};
             return jsonResponse(body, 500);
         };
 
@@ -367,17 +356,15 @@ TEST_SUITE("google_client") {
         CHECK_THROWS_WITH_AS(
             request(TEST_CONFIG, std::ref(other), specOther),
             doctest::Contains("Routes API error 500 INTERNAL: boom"),
-            GoogleError
-        );
+            GoogleError);
     }
 
     TEST_CASE("maps Geocoding status strings to errors, but not ZERO_RESULTS") {
         RecordingTransport denied;
-        denied.reply = [](const HttpCall&) {
+        denied.reply = [](const HttpCall &) {
             Json body = Json{
                 {"status", "REQUEST_DENIED"},
-                {"error_message", "The provided API key is invalid."}
-            };
+                {"error_message", "The provided API key is invalid."}};
             return jsonResponse(body, 200);
         };
 
@@ -387,15 +374,13 @@ TEST_SUITE("google_client") {
         CHECK_THROWS_WITH_AS(
             request(TEST_CONFIG, std::ref(denied), specDenied),
             doctest::Contains("REQUEST_DENIED"),
-            GoogleError
-        );
+            GoogleError);
 
         RecordingTransport none;
-        none.reply = [](const HttpCall&) {
+        none.reply = [](const HttpCall &) {
             Json body = Json{
                 {"status", "ZERO_RESULTS"},
-                {"results", Json::array_t{}}
-            };
+                {"results", Json::array_t{}}};
             return jsonResponse(body, 200);
         };
 
@@ -408,7 +393,7 @@ TEST_SUITE("google_client") {
 
     TEST_CASE("never leaks the key, even if the transport error contains it") {
         RecordingTransport leaky;
-        leaky.reply = [](const HttpCall&) -> HttpCallResponse {
+        leaky.reply = [](const HttpCall &) -> HttpCallResponse {
             throw std::runtime_error("connect failed for https://maps.googleapis.com/x?key=" + TEST_CONFIG.apiKey);
         };
 
@@ -419,7 +404,7 @@ TEST_SUITE("google_client") {
         bool caught = false;
         try {
             request(TEST_CONFIG, std::ref(leaky), spec);
-        } catch (const GoogleError& e) {
+        } catch (const GoogleError &e) {
             caught = true;
             std::string msg = e.what();
             CHECK(msg.find(TEST_CONFIG.apiKey) == std::string::npos);
@@ -441,8 +426,7 @@ TEST_SUITE("google_client") {
         CHECK_THROWS_WITH_AS(
             request(noKey, std::ref(transport), spec),
             doctest::Contains("GOOGLE_PLACES_API_KEY is not set"),
-            GoogleError
-        );
+            GoogleError);
         CHECK(transport.calls.empty());
     }
 
@@ -500,7 +484,7 @@ TEST_SUITE("places") {
 
     TEST_CASE("searchText sends a Pro-tier field mask, home bias and filters, and maps results") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             Json resp = Json{{"places", Json::array_t{RAW_PLACE}}};
             return jsonResponse(resp, 200);
         };
@@ -508,7 +492,7 @@ TEST_SUITE("places") {
         auto places = searchText(TEST_CONFIG, std::ref(transport), "dentist", HOME, 5000, "dentist", "distance", 5);
 
         CHECK(transport.calls.size() == 1);
-        const auto& call = transport.calls[0];
+        const auto &call = transport.calls[0];
         auto body = parse_json<Json>(call.body);
         CHECK(body.has_value());
         CHECK((*body)["textQuery"].get<std::string>() == "dentist");
@@ -520,10 +504,9 @@ TEST_SUITE("places") {
         std::string mask = call.headers.at("X-Goog-FieldMask");
         CHECK(mask.find("places.displayName") != std::string::npos);
 
-        for (const std::string& enterprise : {
-            "rating", "userRatingCount", "priceLevel", "OpeningHours",
-            "reviews", "websiteUri", "PhoneNumber"
-        }) {
+        for (const std::string &enterprise : {
+                 "rating", "userRatingCount", "priceLevel", "OpeningHours",
+                 "reviews", "websiteUri", "PhoneNumber"}) {
             INFO("mask must not request: ", enterprise);
             CHECK(mask.find(enterprise) == std::string::npos);
         }
@@ -534,7 +517,7 @@ TEST_SUITE("places") {
 
     TEST_CASE("searchText handles Google's empty response") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             return HttpCallResponse{.status = 200, .body = "{}"};
         };
 
@@ -544,7 +527,7 @@ TEST_SUITE("places") {
 
     TEST_CASE("searchNearby restricts to a circle with included and excluded types") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             Json resp = Json{{"places", Json::array_t{RAW_PLACE}}};
             return jsonResponse(resp, 200);
         };
@@ -552,7 +535,7 @@ TEST_SUITE("places") {
         searchNearby(TEST_CONFIG, std::ref(transport), HOME, 2000, {"park"}, {"cemetery"}, "popularity", 4);
 
         CHECK(transport.calls.size() == 1);
-        const auto& call = transport.calls[0];
+        const auto &call = transport.calls[0];
         auto body = parse_json<Json>(call.body);
         CHECK(body.has_value());
         CHECK((*body)["includedTypes"].get<Json::array_t>()[0].get<std::string>() == "park");
@@ -563,16 +546,13 @@ TEST_SUITE("places") {
 
     TEST_CASE("resolveCenter home, coordinates and names") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             Json resp = Json{
                 {"places", Json::array_t{
-                    Json{
-                        {"id", "x"},
-                        {"displayName", Json{{"text", "School"}}},
-                        {"location", Json{{"latitude", 53.4}, {"longitude", -6.6}}}
-                    }
-                }}
-            };
+                               Json{
+                                   {"id", "x"},
+                                   {"displayName", Json{{"text", "School"}}},
+                                   {"location", Json{{"latitude", 53.4}, {"longitude", -6.6}}}}}}};
             return jsonResponse(resp, 200);
         };
 
@@ -594,15 +574,14 @@ TEST_SUITE("places") {
 
     TEST_CASE("resolveCenter fails when a name matches nothing") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             return HttpCallResponse{.status = 200, .body = "{}"};
         };
 
         CHECK_THROWS_WITH_AS(
             resolveCenter(TEST_CONFIG, std::ref(transport), "Nowhere At All"),
             doctest::Contains("Couldn't find"),
-            GoogleError
-        );
+            GoogleError);
     }
 
     TEST_CASE("asPlaceId recognizes IDs but not names") {
@@ -616,31 +595,28 @@ TEST_SUITE("places") {
 
     TEST_CASE("placeDetails requests Pro-tier fields only and maps the result") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             Json detail = RAW_PLACE;
             detail["shortFormattedAddress"] = "1 Main St";
             detail["types"] = Json::array_t{"dentist", "health", "Bad Type!"};
             detail["timeZone"] = Json{{"id", "Europe/Dublin"}};
             detail["accessibilityOptions"] = Json{
                 {"wheelchairAccessibleEntrance", true},
-                {"wheelchairAccessibleParking", false}
-            };
+                {"wheelchairAccessibleParking", false}};
             detail["photos"] = Json::array_t{
                 Json{
                     {"name", "places/ChIJabc123/photos/AUc_1"},
                     {"widthPx", 800},
                     {"heightPx", 600},
-                    {"authorAttributions", Json::array_t{Json{{"displayName", "Pat"}}}}
-                },
-                Json{{"name", "../../evil"}, {"widthPx", 1}}
-            };
+                    {"authorAttributions", Json::array_t{Json{{"displayName", "Pat"}}}}},
+                Json{{"name", "../../evil"}, {"widthPx", 1}}};
             return jsonResponse(detail, 200);
         };
 
         auto d = placeDetails(TEST_CONFIG, std::ref(transport), "ChIJabc123", std::nullopt, 3);
 
         CHECK(transport.calls.size() == 1);
-        const auto& call = transport.calls[0];
+        const auto &call = transport.calls[0];
         CHECK(call.method == "GET");
         CHECK(call.url.find("https://places.googleapis.com/v1/places/ChIJabc123?") == 0);
 
@@ -648,10 +624,9 @@ TEST_SUITE("places") {
         CHECK(mask.find("accessibilityOptions") != std::string::npos);
         CHECK(mask.find("photos") != std::string::npos);
 
-        for (const std::string& enterprise : {
-            "rating", "priceLevel", "OpeningHours", "reviews",
-            "websiteUri", "PhoneNumber", "editorialSummary"
-        }) {
+        for (const std::string &enterprise : {
+                 "rating", "priceLevel", "OpeningHours", "reviews",
+                 "websiteUri", "PhoneNumber", "editorialSummary"}) {
             INFO("mask must not request: ", enterprise);
             CHECK(mask.find(enterprise) == std::string::npos);
         }
@@ -665,7 +640,7 @@ TEST_SUITE("places") {
 
     TEST_CASE("placeDetails omits photos from the mask unless asked, and resolves names with a free IDs-only lookup first") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall& call) {
+        transport.reply = [](const HttpCall &call) {
             if (call.method == "POST") {
                 Json resp = Json{{"places", Json::array_t{Json{{"id", "ChIJfound1"}}}}};
                 return jsonResponse(resp, 200);
@@ -685,20 +660,19 @@ TEST_SUITE("places") {
 
     TEST_CASE("placeDetails fails when a name matches nothing") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             return HttpCallResponse{.status = 200, .body = "{}"};
         };
 
         CHECK_THROWS_WITH_AS(
             placeDetails(TEST_CONFIG, std::ref(transport), "Nothing Here", std::nullopt, 0),
             doctest::Contains("No place found"),
-            GoogleError
-        );
+            GoogleError);
     }
 
     TEST_CASE("photoUri validates the reference and returns the image URL") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             Json resp = Json{{"name", "x"}, {"photoUri", "https://lh3.googleusercontent.com/abc"}};
             return jsonResponse(resp, 200);
         };
@@ -712,19 +686,17 @@ TEST_SUITE("places") {
         CHECK_THROWS_WITH_AS(
             photoUri(TEST_CONFIG, std::ref(transport), "places/x/../../y", 640),
             doctest::Contains("Photo must be a reference"),
-            GoogleError
-        );
+            GoogleError);
 
         RecordingTransport insecure;
-        insecure.reply = [](const HttpCall&) {
+        insecure.reply = [](const HttpCall &) {
             Json resp = Json{{"photoUri", "http://insecure"}};
             return jsonResponse(resp, 200);
         };
         CHECK_THROWS_WITH_AS(
             photoUri(TEST_CONFIG, std::ref(insecure), "places/a/photos/b", 640),
             doctest::Contains("no photo URL"),
-            GoogleError
-        );
+            GoogleError);
     }
 }
 
@@ -753,24 +725,20 @@ TEST_SUITE("routes") {
         CHECK_THROWS_WITH_AS(
             waypoint("  ", HOME),
             doctest::Contains("can't be empty"),
-            GoogleError
-        );
+            GoogleError);
     }
 
     TEST_CASE("computeRoute static by default: no routing preference, minimal field mask") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             Json reply = Json{
                 {"routes", Json::array_t{
-                    Json{
-                        {"duration", "2280s"},
-                        {"staticDuration", "2100s"},
-                        {"distanceMeters", 41400},
-                        {"description", "M4"},
-                        {"warnings", Json::array_t{"Toll road\u200B ahead"}}
-                    }
-                }}
-            };
+                               Json{
+                                   {"duration", "2280s"},
+                                   {"staticDuration", "2100s"},
+                                   {"distanceMeters", 41400},
+                                   {"description", "M4"},
+                                   {"warnings", Json::array_t{"Toll road\u200B ahead"}}}}}};
             return jsonResponse(reply, 200);
         };
 
@@ -785,11 +753,10 @@ TEST_SUITE("routes") {
             false,
             {},
             false,
-            false
-        );
+            false);
 
         CHECK(transport.calls.size() == 1);
-        const auto& call = transport.calls[0];
+        const auto &call = transport.calls[0];
         auto body = parse_json<Json>(call.body);
         CHECK(body.has_value());
         CHECK(call.url == "https://routes.googleapis.com/directions/v2:computeRoutes");
@@ -807,12 +774,10 @@ TEST_SUITE("routes") {
 
     TEST_CASE("computeRoute traffic or departAt turns on traffic-aware routing; avoid becomes route modifiers") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             Json reply = Json{
                 {"routes", Json::array_t{
-                    Json{{"duration", "1000s"}, {"distanceMeters", 10000}}
-                }}
-            };
+                               Json{{"duration", "1000s"}, {"distanceMeters", 10000}}}}};
             return jsonResponse(reply, 200);
         };
 
@@ -827,8 +792,7 @@ TEST_SUITE("routes") {
             true,
             {"tolls", "ferries"},
             false,
-            false
-        );
+            false);
 
         auto body1 = parse_json<Json>(transport.calls[0].body);
         CHECK(body1.has_value());
@@ -838,7 +802,7 @@ TEST_SUITE("routes") {
         CHECK((*body1)["routeModifiers"]["avoidFerries"].get<bool>() == true);
 
         RecordingTransport timed;
-        timed.reply = [](const HttpCall&) {
+        timed.reply = [](const HttpCall &) {
             Json reply = Json{{"routes", Json::array_t{Json{{"duration", "1000s"}, {"distanceMeters", 10000}}}}};
             return jsonResponse(reply, 200);
         };
@@ -854,8 +818,7 @@ TEST_SUITE("routes") {
             false,
             {},
             false,
-            false
-        );
+            false);
 
         auto body2 = parse_json<Json>(timed.calls[0].body);
         CHECK(body2.has_value());
@@ -865,7 +828,7 @@ TEST_SUITE("routes") {
 
     TEST_CASE("computeRoute walking has no traffic or modifiers, and departAt is refused") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             Json reply = Json{{"routes", Json::array_t{Json{{"duration", "1000s"}, {"distanceMeters", 10000}}}}};
             return jsonResponse(reply, 200);
         };
@@ -881,8 +844,7 @@ TEST_SUITE("routes") {
             true,
             {"tolls"},
             false,
-            false
-        );
+            false);
 
         auto body = parse_json<Json>(transport.calls[0].body);
         CHECK(body.has_value());
@@ -902,16 +864,14 @@ TEST_SUITE("routes") {
                 false,
                 {},
                 false,
-                false
-            ),
+                false),
             doctest::Contains("departAt only applies"),
-            GoogleError
-        );
+            GoogleError);
     }
 
     TEST_CASE("computeRoute arriveBy is transit-only and exclusive with departAt") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             Json reply = Json{{"routes", Json::array_t{Json{{"duration", "1000s"}, {"distanceMeters", 10000}}}}};
             return jsonResponse(reply, 200);
         };
@@ -919,14 +879,12 @@ TEST_SUITE("routes") {
         CHECK_THROWS_WITH_AS(
             computeRoute(TEST_CONFIG, std::ref(transport), "a", "b", "drive", std::nullopt, "2099-01-01T08:00:00Z", false, {}, false, false),
             doctest::Contains("arriveBy only applies to transit"),
-            GoogleError
-        );
+            GoogleError);
 
         CHECK_THROWS_WITH_AS(
             computeRoute(TEST_CONFIG, std::ref(transport), "a", "b", "transit", "2099-01-01T07:00:00Z", "2099-01-01T08:00:00Z", false, {}, false, false),
             doctest::Contains("either departAt or arriveBy"),
-            GoogleError
-        );
+            GoogleError);
 
         computeRoute(TEST_CONFIG, std::ref(transport), "a", "b", "transit", std::nullopt, "2099-01-01T08:00:00Z", false, {}, false, false);
         auto body = parse_json<Json>(transport.calls[0].body);
@@ -936,44 +894,31 @@ TEST_SUITE("routes") {
 
     TEST_CASE("computeRoute steps add transit details to the mask and the result") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             Json reply = Json{
                 {"routes", Json::array_t{
-                    Json{
-                        {"duration", "1800s"},
-                        {"distanceMeters", 20000},
-                        {"legs", Json::array_t{
-                            Json{
-                                {"steps", Json::array_t{
-                                    Json{
-                                        {"navigationInstruction", Json{{"instructions", "Walk to the stop"}}},
-                                        {"distanceMeters", 200},
-                                        {"staticDuration", "120s"},
-                                        {"travelMode", "WALK"}
-                                    },
-                                    Json{
-                                        {"distanceMeters", 19000},
-                                        {"staticDuration", "1500s"},
-                                        {"travelMode", "TRANSIT"},
-                                        {"transitDetails", Json{
-                                            {"stopDetails", Json{
-                                                {"departureStop", Json{{"name", "Maynooth"}}},
-                                                {"arrivalStop", Json{{"name", "Connolly"}}}
-                                            }},
-                                            {"transitLine", Json{
-                                                {"nameShort", "M3"},
-                                                {"vehicle", Json{{"type", "HEAVY_RAIL"}}}
-                                            }},
-                                            {"headsign", "Dublin"},
-                                            {"stopCount", 9}
-                                        }}
-                                    }
-                                }}
-                            }
-                        }}
-                    }
-                }}
-            };
+                               Json{
+                                   {"duration", "1800s"},
+                                   {"distanceMeters", 20000},
+                                   {"legs", Json::array_t{
+                                                Json{
+                                                    {"steps", Json::array_t{
+                                                                  Json{
+                                                                      {"navigationInstruction", Json{{"instructions", "Walk to the stop"}}},
+                                                                      {"distanceMeters", 200},
+                                                                      {"staticDuration", "120s"},
+                                                                      {"travelMode", "WALK"}},
+                                                                  Json{
+                                                                      {"distanceMeters", 19000},
+                                                                      {"staticDuration", "1500s"},
+                                                                      {"travelMode", "TRANSIT"},
+                                                                      {"transitDetails", Json{
+                                                                                             {"stopDetails", Json{
+                                                                                                                 {"departureStop", Json{{"name", "Maynooth"}}},
+                                                                                                                 {"arrivalStop", Json{{"name", "Connolly"}}}}},
+                                                                                             {"transitLine", Json{{"nameShort", "M3"}, {"vehicle", Json{{"type", "HEAVY_RAIL"}}}}},
+                                                                                             {"headsign", "Dublin"},
+                                                                                             {"stopCount", 9}}}}}}}}}}}}};
             return jsonResponse(reply, 200);
         };
 
@@ -988,13 +933,12 @@ TEST_SUITE("routes") {
             false,
             {},
             false,
-            true
-        );
+            true);
 
         CHECK(transport.calls[0].headers.at("X-Goog-FieldMask").find("transitDetails") != std::string::npos);
         CHECK(routes.size() == 1);
         CHECK(routes[0].steps.size() == 2);
-        const auto& tStep = routes[0].steps[1];
+        const auto &tStep = routes[0].steps[1];
         CHECK(tStep.transit.has_value());
         CHECK(tStep.transit->line.value_or("") == "M3");
         CHECK(tStep.transit->vehicle.value_or("") == "heavy_rail");
@@ -1006,7 +950,7 @@ TEST_SUITE("routes") {
 
     TEST_CASE("computeRoute no route yields an empty list") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             return HttpCallResponse{.status = 200, .body = "{}"};
         };
 
@@ -1016,12 +960,11 @@ TEST_SUITE("routes") {
 
     TEST_CASE("computeMatrix builds waypoints, orders elements and marks missing routes") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             Json reply = Json::array_t{
                 Json{{"originIndex", 1}, {"destinationIndex", 0}, {"condition", "ROUTE_EXISTS"}, {"duration", "600s"}, {"distanceMeters", 5000}},
                 Json{{"originIndex", 0}, {"destinationIndex", 1}, {"condition", "ROUTE_NOT_FOUND"}},
-                Json{{"originIndex", 0}, {"destinationIndex", 0}, {"condition", "ROUTE_EXISTS"}, {"duration", "300s"}, {"distanceMeters", 2500}}
-            };
+                Json{{"originIndex", 0}, {"destinationIndex", 0}, {"condition", "ROUTE_EXISTS"}, {"duration", "300s"}, {"distanceMeters", 2500}}};
             return jsonResponse(reply, 200);
         };
 
@@ -1032,11 +975,10 @@ TEST_SUITE("routes") {
             {"Clinic A", "Clinic B"},
             "drive",
             std::nullopt,
-            false
-        );
+            false);
 
         CHECK(transport.calls.size() == 1);
-        const auto& call = transport.calls[0];
+        const auto &call = transport.calls[0];
         auto body = parse_json<Json>(call.body);
         CHECK(body.has_value());
         CHECK(call.url == "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix");
@@ -1063,22 +1005,22 @@ TEST_SUITE("routes") {
     TEST_CASE("computeMatrix enforces size limits before calling Google") {
         RecordingTransport transport;
         std::vector<std::string> many11;
-        for (int i = 0; i < 11; ++i) many11.push_back("p" + std::to_string(i));
+        for (int i = 0; i < 11; ++i)
+            many11.push_back("p" + std::to_string(i));
 
         CHECK_THROWS_WITH_AS(
             computeMatrix(TEST_CONFIG, std::ref(transport), many11, many11, "transit", std::nullopt, false),
             doctest::Contains("Too many pairs"),
-            GoogleError
-        );
+            GoogleError);
 
         std::vector<std::string> many26;
-        for (int i = 0; i < 26; ++i) many26.push_back("p" + std::to_string(i));
+        for (int i = 0; i < 26; ++i)
+            many26.push_back("p" + std::to_string(i));
 
         CHECK_THROWS_WITH_AS(
             computeMatrix(TEST_CONFIG, std::ref(transport), many26, {"x"}, "drive", std::nullopt, false),
             doctest::Contains("Too many pairs"),
-            GoogleError
-        );
+            GoogleError);
         CHECK(transport.calls.empty());
     }
 }
@@ -1091,21 +1033,20 @@ TEST_SUITE("commands") {
     TEST_CASE("app registers all 9 tools and schemas are strict") {
         auto app = make_google_places_app(TEST_CONFIG);
         std::vector<std::string> toolNames;
-        for (const auto& [name, def] : app.tools()) {
+        for (const auto &[name, def] : app.tools()) {
             toolNames.push_back(name);
             CHECK(def.inputSchema["type"].get<std::string>() == "object");
             CHECK(def.inputSchema["additionalProperties"].get<bool>() == false);
         }
         std::sort(toolNames.begin(), toolNames.end());
         std::vector<std::string> expected = {
-            "details", "geocode", "matrix", "nearby", "photo", "resolve", "route", "search", "status"
-        };
+            "details", "geocode", "matrix", "nearby", "photo", "resolve", "route", "search", "status"};
         CHECK(toolNames == expected);
     }
 
     TEST_CASE("search returns places near the home area with the untrusted notice") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             Json resp = Json{{"places", Json::array_t{RAW_PLACE}}};
             return jsonResponse(resp, 200);
         };
@@ -1122,18 +1063,15 @@ TEST_SUITE("commands") {
 
     TEST_CASE("search resolves a named near first, and disabled API gives clear error") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall& call) {
+        transport.reply = [](const HttpCall &call) {
             auto body = parse_json<Json>(call.body);
             if (body && (*body).contains("textQuery") && (*body)["textQuery"].get<std::string>() == "the school") {
                 Json resp = Json{
                     {"places", Json::array_t{
-                        Json{
-                            {"id", "s"},
-                            {"displayName", Json{{"text", "School"}}},
-                            {"location", Json{{"latitude", 53.4}, {"longitude", -6.6}}}
-                        }
-                    }}
-                };
+                                   Json{
+                                       {"id", "s"},
+                                       {"displayName", Json{{"text", "School"}}},
+                                       {"location", Json{{"latitude", 53.4}, {"longitude", -6.6}}}}}}};
                 return jsonResponse(resp, 200);
             }
             Json resp = Json{{"places", Json::array_t{RAW_PLACE}}};
@@ -1141,11 +1079,7 @@ TEST_SUITE("commands") {
         };
 
         auto app = make_google_places_app(TEST_CONFIG, std::ref(transport));
-        auto r = runTool(app, "search", Json{
-            {"query", "dentist"},
-            {"near", "the school"},
-            {"rank", "distance"}
-        });
+        auto r = runTool(app, "search", Json{{"query", "dentist"}, {"near", "the school"}, {"rank", "distance"}});
 
         CHECK(!r.isError);
         CHECK(r.json["near"].get<std::string>() == "School");
@@ -1153,17 +1087,13 @@ TEST_SUITE("commands") {
 
         // Disabled API error
         RecordingTransport disabled;
-        disabled.reply = [](const HttpCall&) {
+        disabled.reply = [](const HttpCall &) {
             Json body = Json{
                 {"error", Json{
-                    {"details", Json::array_t{
-                        Json{
-                            {"reason", "SERVICE_DISABLED"},
-                            {"metadata", Json{{"activationUrl", "https://example.test/on"}}}
-                        }
-                    }}
-                }}
-            };
+                              {"details", Json::array_t{
+                                              Json{
+                                                  {"reason", "SERVICE_DISABLED"},
+                                                  {"metadata", Json{{"activationUrl", "https://example.test/on"}}}}}}}}};
             return jsonResponse(body, 403);
         };
 
@@ -1176,7 +1106,7 @@ TEST_SUITE("commands") {
 
     TEST_CASE("nearby, resolve and details") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             Json resp = Json{{"places", Json::array_t{RAW_PLACE}}};
             return jsonResponse(resp, 200);
         };
@@ -1184,10 +1114,7 @@ TEST_SUITE("commands") {
         auto app = make_google_places_app(TEST_CONFIG, std::ref(transport));
 
         // nearby needs types
-        auto okNearby = runTool(app, "nearby", Json{
-            {"types", Json::array_t{"dentist", "doctor"}},
-            {"radius", 1000}
-        });
+        auto okNearby = runTool(app, "nearby", Json{{"types", Json::array_t{"dentist", "doctor"}}, {"radius", 1000}});
         CHECK(!okNearby.isError);
         CHECK(okNearby.json["places"].get<Json::array_t>().size() == 1);
         auto sent = parse_json<Json>(transport.calls[0].body);
@@ -1197,23 +1124,20 @@ TEST_SUITE("commands") {
 
         // resolve returns candidates
         RecordingTransport resolveTransport;
-        resolveTransport.reply = [](const HttpCall&) {
+        resolveTransport.reply = [](const HttpCall &) {
             Json p2 = RAW_PLACE;
             p2["id"] = "ChIJother99";
             Json resp = Json{{"places", Json::array_t{RAW_PLACE, p2}}};
             return jsonResponse(resp, 200);
         };
         auto appResolve = make_google_places_app(TEST_CONFIG, std::ref(resolveTransport));
-        auto rResolve = runTool(appResolve, "resolve", Json{
-            {"text", "Maynooth Dental"},
-            {"limit", 2}
-        });
+        auto rResolve = runTool(appResolve, "resolve", Json{{"text", "Maynooth Dental"}, {"limit", 2}});
         CHECK(!rResolve.isError);
         CHECK(rResolve.json["places"].get<Json::array_t>().size() == 2);
 
         // details returns the place and notice, and no Enterprise fields
         RecordingTransport detailTransport;
-        detailTransport.reply = [](const HttpCall&) {
+        detailTransport.reply = [](const HttpCall &) {
             Json detail = RAW_PLACE;
             detail["timeZone"] = Json{{"id", "Europe/Dublin"}};
             detail["types"] = Json::array_t{"dentist"};
@@ -1224,8 +1148,8 @@ TEST_SUITE("commands") {
         CHECK(!rDetail.isError);
         CHECK(rDetail.json["place"]["timeZone"].get<std::string>() == "Europe/Dublin");
         CHECK(rDetail.json["notice"].get<std::string>() == UNTRUSTED_NOTICE);
-        const auto& pl = rDetail.json["place"];
-        for (const std::string& key : {"rating", "reviews", "phone", "website", "hours", "openNow"}) {
+        const auto &pl = rDetail.json["place"];
+        for (const std::string &key : {"rating", "reviews", "phone", "website", "hours", "openNow"}) {
             INFO("place must not contain: ", key);
             CHECK(!pl.contains(key));
         }
@@ -1233,12 +1157,10 @@ TEST_SUITE("commands") {
 
     TEST_CASE("route, matrix and geocode") {
         RecordingTransport transport;
-        transport.reply = [](const HttpCall&) {
+        transport.reply = [](const HttpCall &) {
             Json resp = Json{
                 {"routes", Json::array_t{
-                    Json{{"duration", "1200s"}, {"distanceMeters", 15000}, {"description", "N4"}}
-                }}
-            };
+                               Json{{"duration", "1200s"}, {"distanceMeters", 15000}, {"description", "N4"}}}}};
             return jsonResponse(resp, 200);
         };
 
@@ -1254,26 +1176,20 @@ TEST_SUITE("commands") {
         // route reports a past departure before calling Google
         RecordingTransport pastTransport;
         auto appPast = make_google_places_app(TEST_CONFIG, std::ref(pastTransport));
-        auto rPast = runTool(appPast, "route", Json{
-            {"origin", "a"}, {"destination", "b"}, {"departAt", "2020-01-01T08:00"}
-        });
+        auto rPast = runTool(appPast, "route", Json{{"origin", "a"}, {"destination", "b"}, {"departAt", "2020-01-01T08:00"}});
         CHECK(rPast.isError);
         CHECK(rPast.errorText.find("in the past") != std::string::npos);
         CHECK(pastTransport.calls.empty());
 
         // matrix takes list of points
         RecordingTransport matrixTransport;
-        matrixTransport.reply = [](const HttpCall&) {
+        matrixTransport.reply = [](const HttpCall &) {
             Json resp = Json::array_t{
-                Json{{"originIndex", 0}, {"destinationIndex", 0}, {"condition", "ROUTE_EXISTS"}, {"duration", "60s"}, {"distanceMeters", 500}}
-            };
+                Json{{"originIndex", 0}, {"destinationIndex", 0}, {"condition", "ROUTE_EXISTS"}, {"duration", "60s"}, {"distanceMeters", 500}}};
             return jsonResponse(resp, 200);
         };
         auto appMatrix = make_google_places_app(TEST_CONFIG, std::ref(matrixTransport));
-        auto rMatrix = runTool(appMatrix, "matrix", Json{
-            {"origins", Json::array_t{"home | School"}},
-            {"destinations", Json::array_t{"A|B"}}
-        });
+        auto rMatrix = runTool(appMatrix, "matrix", Json{{"origins", Json::array_t{"home | School"}}, {"destinations", Json::array_t{"A|B"}}});
         CHECK(!rMatrix.isError);
         auto sent = parse_json<Json>(matrixTransport.calls[0].body);
         CHECK(sent.has_value());
@@ -1283,21 +1199,17 @@ TEST_SUITE("commands") {
 
         // geocode maps results, treats ZERO_RESULTS as empty, and reverse-geocodes coordinates
         RecordingTransport geoHit;
-        geoHit.reply = [](const HttpCall&) {
+        geoHit.reply = [](const HttpCall &) {
             Json resp = Json{
                 {"status", "OK"},
                 {"results", Json::array_t{
-                    Json{
-                        {"formatted_address", "Main St, Maynooth"},
-                        {"geometry", Json{
-                            {"location", Json{{"lat", 53.38}, {"lng", -6.59}}},
-                            {"location_type", "ROOFTOP"}
-                        }},
-                        {"place_id", "p1"},
-                        {"types", Json::array_t{"street_address"}}
-                    }
-                }}
-            };
+                                Json{
+                                    {"formatted_address", "Main St, Maynooth"},
+                                    {"geometry", Json{
+                                                     {"location", Json{{"lat", 53.38}, {"lng", -6.59}}},
+                                                     {"location_type", "ROOFTOP"}}},
+                                    {"place_id", "p1"},
+                                    {"types", Json::array_t{"street_address"}}}}}};
             return jsonResponse(resp, 200);
         };
         auto appGeo = make_google_places_app(TEST_CONFIG, std::ref(geoHit));
@@ -1307,7 +1219,7 @@ TEST_SUITE("commands") {
         CHECK(rGeo.json["results"].get<Json::array_t>()[0]["precision"].get<std::string>() == "ROOFTOP");
 
         RecordingTransport geoNone;
-        geoNone.reply = [](const HttpCall&) {
+        geoNone.reply = [](const HttpCall &) {
             return HttpCallResponse{.status = 200, .body = R"({"status":"ZERO_RESULTS","results":[]})"};
         };
         auto appGeoNone = make_google_places_app(TEST_CONFIG, std::ref(geoNone));
@@ -1316,7 +1228,7 @@ TEST_SUITE("commands") {
         CHECK(rGeoNone.json["results"].get<Json::array_t>().empty());
 
         RecordingTransport geoRev;
-        geoRev.reply = [](const HttpCall&) {
+        geoRev.reply = [](const HttpCall &) {
             return HttpCallResponse{.status = 200, .body = R"({"status":"OK","results":[]})"};
         };
         auto appGeoRev = make_google_places_app(TEST_CONFIG, std::ref(geoRev));
@@ -1326,7 +1238,7 @@ TEST_SUITE("commands") {
 
     TEST_CASE("photo and status") {
         RecordingTransport photoTransport;
-        photoTransport.reply = [](const HttpCall& call) {
+        photoTransport.reply = [](const HttpCall &call) {
             if (call.url.find("/media") != std::string::npos) {
                 Json resp = Json{{"photoUri", "https://lh3.googleusercontent.com/x"}};
                 return jsonResponse(resp, 200);
@@ -1355,7 +1267,7 @@ TEST_SUITE("commands") {
 
         // status reports settings without calling Google, and probes only on request
         RecordingTransport statusTransport;
-        statusTransport.reply = [](const HttpCall& call) {
+        statusTransport.reply = [](const HttpCall &call) {
             if (call.url.find("/geocode") != std::string::npos) {
                 return HttpCallResponse{.status = 200, .body = R"({"status":"OK","results":[]})"};
             }
@@ -1372,7 +1284,7 @@ TEST_SUITE("commands") {
 
         auto rProbe = runTool(appStatus, "status", Json{{"probe", true}});
         CHECK(!rProbe.isError);
-        const auto& probes = rProbe.json["probes"];
+        const auto &probes = rProbe.json["probes"];
         CHECK(probes["geocoding"]["ok"].get<bool>() == true);
         CHECK(probes["places"]["ok"].get<bool>() == true);
         CHECK(probes["routes"]["ok"].get<bool>() == true);
@@ -1382,9 +1294,12 @@ TEST_SUITE("commands") {
     TEST_CASE("http transport, server/discover, tools/list, CLI, and config fallback") {
         struct LoopbackFd {
             int fd{-1};
-            ~LoopbackFd() { if (fd >= 0) ::close(fd); }
-            LoopbackFd(const LoopbackFd&) = delete;
-            LoopbackFd& operator=(const LoopbackFd&) = delete;
+            ~LoopbackFd() {
+                if (fd >= 0)
+                    ::close(fd);
+            }
+            LoopbackFd(const LoopbackFd &) = delete;
+            LoopbackFd &operator=(const LoopbackFd &) = delete;
             LoopbackFd() = default;
         };
 
@@ -1398,13 +1313,14 @@ TEST_SUITE("commands") {
             addr.sin_family = AF_INET;
             addr.sin_port = htons(port);
             REQUIRE(::inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr) == 1);
-            REQUIRE(::connect(sock.fd, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) == 0);
+            REQUIRE(::connect(sock.fd, reinterpret_cast<const sockaddr *>(&addr), sizeof(addr)) == 0);
 
             std::string req = "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:" + std::to_string(port) + "\r\n"
-                              "Content-Type: application/json\r\n"
-                              "Accept: application/json, text/event-stream\r\n"
-                              "MCP-Protocol-Version: 2026-07-28\r\n"
-                              "Mcp-Method: " + std::string(method) + "\r\n";
+                                                                                                "Content-Type: application/json\r\n"
+                                                                                                "Accept: application/json, text/event-stream\r\n"
+                                                                                                "MCP-Protocol-Version: 2026-07-28\r\n"
+                                                                                                "Mcp-Method: " +
+                              std::string(method) + "\r\n";
             if (!toolName.empty()) {
                 req += "Mcp-Name: " + std::string(toolName) + "\r\n";
             }
@@ -1424,7 +1340,8 @@ TEST_SUITE("commands") {
                 pollfd pfd{sock.fd, POLLIN, 0};
                 REQUIRE(::poll(&pfd, 1, 5000) > 0);
                 ssize_t n = ::recv(sock.fd, buf, sizeof(buf), 0);
-                if (n <= 0) break;
+                if (n <= 0)
+                    break;
                 raw.append(buf, static_cast<size_t>(n));
             }
 
@@ -1434,7 +1351,8 @@ TEST_SUITE("commands") {
             REQUIRE(statusStart != std::string::npos);
             int status = std::stoi(raw.substr(statusStart + 1, 3));
             std::string payload = raw.substr(hdrEnd + 4);
-            if (payload.empty()) return {status, Json()};
+            if (payload.empty())
+                return {status, Json()};
             auto parsed = slimr::parse_json(payload);
             REQUIRE(parsed.has_value());
             return {status, std::move(*parsed)};
@@ -1447,7 +1365,7 @@ TEST_SUITE("commands") {
         {
             char arg0[] = "google-places-mcp";
             char arg1[] = "status";
-            char* argv[] = {arg0, arg1, nullptr};
+            char *argv[] = {arg0, arg1, nullptr};
             CHECK(app.run(2, argv) == 0);
         }
 
@@ -1457,7 +1375,7 @@ TEST_SUITE("commands") {
             char arg1[] = "http";
             char arg2[] = "--host";
             char arg3[] = "0.0.0.0";
-            char* argv[] = {arg0, arg1, arg2, arg3, nullptr};
+            char *argv[] = {arg0, arg1, arg2, arg3, nullptr};
             CHECK(app.run(4, argv) == 1);
         }
         {
@@ -1465,16 +1383,16 @@ TEST_SUITE("commands") {
             char arg1[] = "http";
             char arg2[] = "--port";
             char arg3[] = "0";
-            char* argv[] = {arg0, arg1, arg2, arg3, nullptr};
+            char *argv[] = {arg0, arg1, arg2, arg3, nullptr};
             CHECK(app.run(4, argv) == 1);
         }
 
         // Ephemeral HTTP server roundtrip
         slimr::McpHttpServer server(app, slimr::HttpServerOptions{
-            .host = "127.0.0.1",
-            .port = 0,
-            .allowEphemeralPort = true,
-        });
+                                             .host = "127.0.0.1",
+                                             .port = 0,
+                                             .allowEphemeralPort = true,
+                                         });
         std::string err;
         REQUIRE(server.start(&err));
         const uint16_t port = server.boundPort();
@@ -1497,11 +1415,11 @@ TEST_SUITE("commands") {
                 std::string(kMeta) + "}}");
         CHECK(listStatus == 200);
         std::set<std::string> names;
-        for (const auto& t : listed["result"]["tools"].get<Json::array_t>()) {
+        for (const auto &t : listed["result"]["tools"].get<Json::array_t>()) {
             names.insert(t["name"].get<std::string>());
         }
         CHECK(names == std::set<std::string>{
-            "search", "nearby", "details", "resolve", "geocode", "route", "matrix", "photo", "status"});
+                           "search", "nearby", "details", "resolve", "geocode", "route", "matrix", "photo", "status"});
 
         auto [callStatus, called] = postMcp(
             port, "tools/call",

@@ -1,10 +1,10 @@
 #pragma once
 
 #include "google_client.hpp"
+#include "json.hpp"
 #include "places.hpp"
 #include "types.hpp"
 #include "util.hpp"
-#include "json.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -23,7 +23,8 @@ inline slimr::Json waypoint(std::string_view text, LatLng home) {
     std::string t = std::string(text.substr(s, text.find_last_not_of(" \t\r\n") - s + 1));
 
     std::string lower = t;
-    for (char& c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    for (char &c : lower)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
     if (lower == "home") {
         slimr::Json j = slimr::Json::object_t{};
@@ -68,14 +69,22 @@ struct TransitDetails {
 
     slimr::Json toJson() const {
         slimr::Json j = slimr::Json::object_t{};
-        if (line) j["line"] = *line;
-        if (vehicle) j["vehicle"] = *vehicle;
-        if (headsign) j["headsign"] = *headsign;
-        if (from) j["from"] = *from;
-        if (to) j["to"] = *to;
-        if (stops) j["stops"] = *stops;
-        if (departs) j["departs"] = *departs;
-        if (arrives) j["arrives"] = *arrives;
+        if (line)
+            j["line"] = *line;
+        if (vehicle)
+            j["vehicle"] = *vehicle;
+        if (headsign)
+            j["headsign"] = *headsign;
+        if (from)
+            j["from"] = *from;
+        if (to)
+            j["to"] = *to;
+        if (stops)
+            j["stops"] = *stops;
+        if (departs)
+            j["departs"] = *departs;
+        if (arrives)
+            j["arrives"] = *arrives;
         return j;
     }
 };
@@ -89,11 +98,14 @@ struct RouteStep {
 
     slimr::Json toJson() const {
         slimr::Json j = slimr::Json::object_t{};
-        if (instruction) j["instruction"] = *instruction;
+        if (instruction)
+            j["instruction"] = *instruction;
         j["distance"] = distance;
         j["duration"] = duration;
-        if (mode) j["mode"] = *mode;
-        if (transit) j["transit"] = transit->toJson();
+        if (mode)
+            j["mode"] = *mode;
+        if (transit)
+            j["transit"] = transit->toJson();
         return j;
     }
 };
@@ -110,20 +122,24 @@ struct RouteResult {
 
     slimr::Json toJson() const {
         slimr::Json j = slimr::Json::object_t{};
-        if (summary) j["summary"] = *summary;
+        if (summary)
+            j["summary"] = *summary;
         j["duration"] = duration;
         j["durationSeconds"] = durationSeconds;
-        if (trafficFreeDurationSeconds) j["trafficFreeDurationSeconds"] = *trafficFreeDurationSeconds;
+        if (trafficFreeDurationSeconds)
+            j["trafficFreeDurationSeconds"] = *trafficFreeDurationSeconds;
         j["distance"] = distance;
         j["distanceMeters"] = distanceMeters;
         if (!warnings.empty()) {
             slimr::Json::array_t arr;
-            for (const auto& w : warnings) arr.push_back(w);
+            for (const auto &w : warnings)
+                arr.push_back(w);
             j["warnings"] = arr;
         }
         if (!steps.empty()) {
             slimr::Json::array_t arr;
-            for (const auto& s : steps) arr.push_back(s.toJson());
+            for (const auto &s : steps)
+                arr.push_back(s.toJson());
             j["steps"] = arr;
         }
         return j;
@@ -148,23 +164,26 @@ struct MatrixElement {
         j["origin"] = origin;
         j["destination"] = destination;
         j["routeFound"] = routeFound;
-        if (duration) j["duration"] = *duration;
-        if (durationSeconds) j["durationSeconds"] = *durationSeconds;
-        if (distance) j["distance"] = *distance;
-        if (distanceMeters) j["distanceMeters"] = *distanceMeters;
+        if (duration)
+            j["duration"] = *duration;
+        if (durationSeconds)
+            j["durationSeconds"] = *durationSeconds;
+        if (distance)
+            j["distance"] = *distance;
+        if (distanceMeters)
+            j["distanceMeters"] = *distanceMeters;
         return j;
     }
 };
 
 inline void applyTiming(
-    const PlacesConfig& config,
-    slimr::Json& body,
+    const PlacesConfig &config,
+    slimr::Json &body,
     std::string_view mode,
-    const std::optional<std::string>& departAt,
-    const std::optional<std::string>& arriveBy,
+    const std::optional<std::string> &departAt,
+    const std::optional<std::string> &arriveBy,
     bool traffic,
-    const std::vector<std::string>& avoid
-) {
+    const std::vector<std::string> &avoid) {
     bool motor = (mode == "drive" || mode == "two_wheeler");
     if (departAt && !departAt->empty() && arriveBy && !arriveBy->empty()) {
         throw GoogleError("Use either departAt or arriveBy, not both.");
@@ -192,10 +211,13 @@ inline void applyTiming(
         bool avoidTolls = false;
         bool avoidHighways = false;
         bool avoidFerries = false;
-        for (const auto& a : avoid) {
-            if (a == "tolls") avoidTolls = true;
-            else if (a == "highways") avoidHighways = true;
-            else if (a == "ferries") avoidFerries = true;
+        for (const auto &a : avoid) {
+            if (a == "tolls")
+                avoidTolls = true;
+            else if (a == "highways")
+                avoidHighways = true;
+            else if (a == "ferries")
+                avoidFerries = true;
         }
         body["routeModifiers"]["avoidTolls"] = avoidTolls;
         body["routeModifiers"]["avoidHighways"] = avoidHighways;
@@ -203,7 +225,7 @@ inline void applyTiming(
     }
 }
 
-inline RouteStep toStep(const slimr::Json& raw) {
+inline RouteStep toStep(const slimr::Json &raw) {
     RouteStep step;
     int64_t distMeters = 0;
     if (raw.contains("distanceMeters") && raw["distanceMeters"].is_number()) {
@@ -218,7 +240,7 @@ inline RouteStep toStep(const slimr::Json& raw) {
     step.duration = formatDuration(durSecs);
 
     if (raw.contains("navigationInstruction") && raw["navigationInstruction"].is_object()) {
-        const auto& nav = raw["navigationInstruction"];
+        const auto &nav = raw["navigationInstruction"];
         if (nav.contains("instructions") && nav["instructions"].is_string()) {
             step.instruction = cleanText(nav["instructions"].get<std::string>(), 200);
         }
@@ -226,16 +248,17 @@ inline RouteStep toStep(const slimr::Json& raw) {
 
     if (raw.contains("travelMode") && raw["travelMode"].is_string()) {
         std::string tm = raw["travelMode"].get<std::string>();
-        for (char& c : tm) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        for (char &c : tm)
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         step.mode = tm;
     }
 
     if (raw.contains("transitDetails") && raw["transitDetails"].is_object()) {
-        const auto& t = raw["transitDetails"];
+        const auto &t = raw["transitDetails"];
         TransitDetails td;
 
         if (t.contains("transitLine") && t["transitLine"].is_object()) {
-            const auto& tl = t["transitLine"];
+            const auto &tl = t["transitLine"];
             std::string lineName;
             if (tl.contains("nameShort") && tl["nameShort"].is_string()) {
                 lineName = tl["nameShort"].get<std::string>();
@@ -248,7 +271,8 @@ inline RouteStep toStep(const slimr::Json& raw) {
             if (tl.contains("vehicle") && tl["vehicle"].is_object() &&
                 tl["vehicle"].contains("type") && tl["vehicle"]["type"].is_string()) {
                 std::string veh = tl["vehicle"]["type"].get<std::string>();
-                for (char& c : veh) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                for (char &c : veh)
+                    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
                 td.vehicle = veh;
             }
         }
@@ -258,7 +282,7 @@ inline RouteStep toStep(const slimr::Json& raw) {
         }
 
         if (t.contains("stopDetails") && t["stopDetails"].is_object()) {
-            const auto& sd = t["stopDetails"];
+            const auto &sd = t["stopDetails"];
             if (sd.contains("departureStop") && sd["departureStop"].is_object() &&
                 sd["departureStop"].contains("name") && sd["departureStop"]["name"].is_string()) {
                 td.from = cleanText(sd["departureStop"]["name"].get<std::string>(), 80);
@@ -285,14 +309,15 @@ inline RouteStep toStep(const slimr::Json& raw) {
     return step;
 }
 
-inline std::optional<RouteResult> toRoute(const slimr::Json& raw, bool withSteps) {
+inline std::optional<RouteResult> toRoute(const slimr::Json &raw, bool withSteps) {
     if (!raw.contains("duration") || !raw["duration"].is_string() ||
         !raw.contains("distanceMeters") || !raw["distanceMeters"].is_number()) {
         return std::nullopt;
     }
 
     auto secOpt = parseGoogleDuration(raw["duration"].get<std::string>());
-    if (!secOpt) return std::nullopt;
+    if (!secOpt)
+        return std::nullopt;
     int64_t seconds = *secOpt;
     int64_t distMeters = raw["distanceMeters"].get<int64_t>();
 
@@ -314,18 +339,19 @@ inline std::optional<RouteResult> toRoute(const slimr::Json& raw, bool withSteps
     }
 
     if (raw.contains("warnings") && raw["warnings"].is_array()) {
-        for (const auto& w : raw["warnings"].get<slimr::Json::array_t>()) {
+        for (const auto &w : raw["warnings"].get<slimr::Json::array_t>()) {
             if (w.is_string()) {
                 auto cleaned = cleanText(w.get<std::string>(), 200);
-                if (cleaned) route.warnings.push_back(std::move(*cleaned));
+                if (cleaned)
+                    route.warnings.push_back(std::move(*cleaned));
             }
         }
     }
 
     if (withSteps && raw.contains("legs") && raw["legs"].is_array()) {
-        for (const auto& leg : raw["legs"].get<slimr::Json::array_t>()) {
+        for (const auto &leg : raw["legs"].get<slimr::Json::array_t>()) {
             if (leg.contains("steps") && leg["steps"].is_array()) {
-                for (const auto& s : leg["steps"].get<slimr::Json::array_t>()) {
+                for (const auto &s : leg["steps"].get<slimr::Json::array_t>()) {
                     route.steps.push_back(toStep(s));
                 }
             }
@@ -336,27 +362,31 @@ inline std::optional<RouteResult> toRoute(const slimr::Json& raw, bool withSteps
 }
 
 inline std::string toTravelMode(std::string_view mode) {
-    if (mode == "drive") return "DRIVE";
-    if (mode == "walk") return "WALK";
-    if (mode == "bicycle") return "BICYCLE";
-    if (mode == "transit") return "TRANSIT";
-    if (mode == "two_wheeler") return "TWO_WHEELER";
+    if (mode == "drive")
+        return "DRIVE";
+    if (mode == "walk")
+        return "WALK";
+    if (mode == "bicycle")
+        return "BICYCLE";
+    if (mode == "transit")
+        return "TRANSIT";
+    if (mode == "two_wheeler")
+        return "TWO_WHEELER";
     return "DRIVE";
 }
 
 inline std::vector<RouteResult> computeRoute(
-    const PlacesConfig& config,
+    const PlacesConfig &config,
     HttpTransport transport,
     std::string_view origin,
     std::string_view destination,
     std::string_view mode,
-    const std::optional<std::string>& departAt,
-    const std::optional<std::string>& arriveBy,
+    const std::optional<std::string> &departAt,
+    const std::optional<std::string> &arriveBy,
     bool traffic,
-    const std::vector<std::string>& avoid,
+    const std::vector<std::string> &avoid,
     bool alternatives,
-    bool steps
-) {
+    bool steps) {
     slimr::Json body = slimr::Json::object_t{};
     body["origin"] = waypoint(origin, config.home);
     body["destination"] = waypoint(destination, config.home);
@@ -387,26 +417,26 @@ inline std::vector<RouteResult> computeRoute(
 
     std::vector<RouteResult> out;
     if (json.contains("routes") && json["routes"].is_array()) {
-        for (const auto& r : json["routes"].get<slimr::Json::array_t>()) {
+        for (const auto &r : json["routes"].get<slimr::Json::array_t>()) {
             auto route = toRoute(r, steps);
-            if (route) out.push_back(std::move(*route));
+            if (route)
+                out.push_back(std::move(*route));
         }
     }
     return out;
 }
 
 inline std::vector<MatrixElement> computeMatrix(
-    const PlacesConfig& config,
+    const PlacesConfig &config,
     HttpTransport transport,
-    const std::vector<std::string>& rawOrigins,
-    const std::vector<std::string>& rawDestinations,
+    const std::vector<std::string> &rawOrigins,
+    const std::vector<std::string> &rawDestinations,
     std::string_view mode,
-    const std::optional<std::string>& departAt,
-    bool traffic
-) {
+    const std::optional<std::string> &departAt,
+    bool traffic) {
     // Expand pipe-separated items if present
     std::vector<std::string> origins;
-    for (const auto& o : rawOrigins) {
+    for (const auto &o : rawOrigins) {
         std::stringstream ss(o);
         std::string item;
         while (std::getline(ss, item, '|')) {
@@ -418,7 +448,7 @@ inline std::vector<MatrixElement> computeMatrix(
     }
 
     std::vector<std::string> destinations;
-    for (const auto& d : rawDestinations) {
+    for (const auto &d : rawDestinations) {
         std::stringstream ss(d);
         std::string item;
         while (std::getline(ss, item, '|')) {
@@ -435,13 +465,12 @@ inline std::vector<MatrixElement> computeMatrix(
         throw GoogleError(
             "Too many pairs: at most 25 origins, 25 destinations and " + std::to_string(limit) +
             " pairs for " + std::string(mode) + " (got " + std::to_string(origins.size()) +
-            "×" + std::to_string(destinations.size()) + ")."
-        );
+            "×" + std::to_string(destinations.size()) + ").");
     }
 
     slimr::Json body = slimr::Json::object_t{};
     slimr::Json::array_t oArr;
-    for (const auto& o : origins) {
+    for (const auto &o : origins) {
         slimr::Json w = slimr::Json::object_t{};
         w["waypoint"] = waypoint(o, config.home);
         oArr.push_back(w);
@@ -449,7 +478,7 @@ inline std::vector<MatrixElement> computeMatrix(
     body["origins"] = oArr;
 
     slimr::Json::array_t dArr;
-    for (const auto& d : destinations) {
+    for (const auto &d : destinations) {
         slimr::Json w = slimr::Json::object_t{};
         w["waypoint"] = waypoint(d, config.home);
         dArr.push_back(w);
@@ -473,7 +502,7 @@ inline std::vector<MatrixElement> computeMatrix(
 
     std::vector<MatrixElement> out;
     if (json.is_array()) {
-        for (const auto& e : json.get<slimr::Json::array_t>()) {
+        for (const auto &e : json.get<slimr::Json::array_t>()) {
             int64_t i = e.contains("originIndex") && e["originIndex"].is_number() ? e["originIndex"].get<int64_t>() : 0;
             int64_t j = e.contains("destinationIndex") && e["destinationIndex"].is_number() ? e["destinationIndex"].get<int64_t>() : 0;
 
@@ -513,8 +542,9 @@ inline std::vector<MatrixElement> computeMatrix(
         }
     }
 
-    std::sort(out.begin(), out.end(), [](const MatrixElement& a, const MatrixElement& b) {
-        if (a.originIndex != b.originIndex) return a.originIndex < b.originIndex;
+    std::sort(out.begin(), out.end(), [](const MatrixElement &a, const MatrixElement &b) {
+        if (a.originIndex != b.originIndex)
+            return a.originIndex < b.originIndex;
         return a.destinationIndex < b.destinationIndex;
     });
 

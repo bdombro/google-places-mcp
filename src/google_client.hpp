@@ -1,9 +1,9 @@
 #pragma once
 
-#include "types.hpp"
-#include "util.hpp"
 #include "curl.hpp"
 #include "json.hpp"
+#include "types.hpp"
+#include "util.hpp"
 
 #include <functional>
 #include <map>
@@ -16,7 +16,7 @@
 namespace google_places {
 
 class GoogleError : public std::runtime_error {
-public:
+  public:
     using std::runtime_error::runtime_error;
 };
 
@@ -32,9 +32,9 @@ struct HttpCallResponse {
     std::string body;
 };
 
-using HttpTransport = std::function<HttpCallResponse(const HttpCall&)>;
+using HttpTransport = std::function<HttpCallResponse(const HttpCall &)>;
 
-inline HttpCallResponse default_curl_transport(const HttpCall& req) {
+inline HttpCallResponse default_curl_transport(const HttpCall &req) {
     slimr::HttpRequest r;
     r.method = req.method;
     r.url = req.url;
@@ -45,7 +45,7 @@ inline HttpCallResponse default_curl_transport(const HttpCall& req) {
     try {
         auto resp = slimr::request(r);
         return HttpCallResponse{.status = resp.status, .body = std::move(resp.body)};
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         std::string msg = e.what();
         if (msg.find("timeout") != std::string::npos ||
             msg.find("timed out") != std::string::npos ||
@@ -57,7 +57,8 @@ inline HttpCallResponse default_curl_transport(const HttpCall& req) {
 }
 
 inline std::string scrub(std::string_view text, std::string_view key) {
-    if (key.empty()) return std::string(text);
+    if (key.empty())
+        return std::string(text);
     std::string res(text);
     size_t pos = 0;
     while ((pos = res.find(key, pos)) != std::string::npos) {
@@ -67,7 +68,7 @@ inline std::string scrub(std::string_view text, std::string_view key) {
     return res;
 }
 
-inline std::optional<std::string> describeFailure(std::string_view api, long status, const slimr::Json& body) {
+inline std::optional<std::string> describeFailure(std::string_view api, long status, const slimr::Json &body) {
     if (api == "geocode") {
         std::string gStatus = body.contains("status") && body["status"].is_string() ? body["status"].get<std::string>() : "";
         if (status < 300 && (gStatus == "OK" || gStatus == "ZERO_RESULTS")) {
@@ -84,7 +85,8 @@ inline std::optional<std::string> describeFailure(std::string_view api, long sta
         return "Geocoding failed (" + statusStr + ")." + message;
     }
 
-    if (status < 300) return std::nullopt;
+    if (status < 300)
+        return std::nullopt;
 
     std::string title = (api == "places") ? "Places API (New)" : "Routes API";
     std::string errMessage;
@@ -94,11 +96,13 @@ inline std::optional<std::string> describeFailure(std::string_view api, long sta
     std::string serviceTitle;
 
     if (body.contains("error") && body["error"].is_object()) {
-        const auto& errObj = body["error"];
-        if (errObj.contains("message") && errObj["message"].is_string()) errMessage = errObj["message"].get<std::string>();
-        if (errObj.contains("status") && errObj["status"].is_string()) errStatus = errObj["status"].get<std::string>();
+        const auto &errObj = body["error"];
+        if (errObj.contains("message") && errObj["message"].is_string())
+            errMessage = errObj["message"].get<std::string>();
+        if (errObj.contains("status") && errObj["status"].is_string())
+            errStatus = errObj["status"].get<std::string>();
         if (errObj.contains("details") && errObj["details"].is_array()) {
-            for (const auto& d : errObj["details"].get<slimr::Json::array_t>()) {
+            for (const auto &d : errObj["details"].get<slimr::Json::array_t>()) {
                 if (d.contains("reason") && d["reason"].is_string()) {
                     reason = d["reason"].get<std::string>();
                     if (d.contains("metadata") && d["metadata"].is_object()) {
@@ -125,7 +129,8 @@ inline std::optional<std::string> describeFailure(std::string_view api, long sta
     }
 
     std::string lowerMsg = errMessage;
-    for (char& c : lowerMsg) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    for (char &c : lowerMsg)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
     if (reason == "API_KEY_INVALID" || lowerMsg.find("api key not valid") != std::string::npos) {
         return "Google rejected the API key (invalid, or restricted to other APIs or referrers).";
@@ -136,7 +141,8 @@ inline std::optional<std::string> describeFailure(std::string_view api, long sta
     }
 
     std::string res = title + " error " + std::to_string(status);
-    if (!errStatus.empty()) res += " " + errStatus;
+    if (!errStatus.empty())
+        res += " " + errStatus;
     res += ": " + (!errMessage.empty() ? errMessage : "no details");
     return res;
 }
@@ -150,12 +156,12 @@ struct RequestSpec {
     slimr::Json body;
 };
 
-inline slimr::Json request(const PlacesConfig& config, HttpTransport transport, const RequestSpec& spec) {
+inline slimr::Json request(const PlacesConfig &config, HttpTransport transport, const RequestSpec &spec) {
     if (!transport) {
         transport = default_curl_transport;
     }
 
-    const std::string& key = config.apiKey;
+    const std::string &key = config.apiKey;
     if (key.empty()) {
         throw GoogleError("GOOGLE_PLACES_API_KEY is not set (GOOGLE_PLACE_API_KEY also works). Add it to your login shell.");
     }
@@ -181,7 +187,7 @@ inline slimr::Json request(const PlacesConfig& config, HttpTransport transport, 
         fullUrl += slimr::url_encode(v);
     };
 
-    for (const auto& [k, v] : spec.query) {
+    for (const auto &[k, v] : spec.query) {
         addQuery(k, v);
     }
 
@@ -208,7 +214,7 @@ inline slimr::Json request(const PlacesConfig& config, HttpTransport transport, 
     HttpCallResponse res;
     try {
         res = transport(call);
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         throw GoogleError(scrub(e.what(), key));
     }
 
