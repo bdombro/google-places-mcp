@@ -1,16 +1,16 @@
 class GooglePlacesMcp < Formula
   desc "Google Places, Routes, and Geocoding MCP server (Pro tier and below)"
   homepage "https://github.com/bdombro/google-places-mcp"
-  version "3.0.0"
+  version "3.1.0"
 
   on_macos do
-    url "https://github.com/bdombro/google-places-mcp/releases/download/v3.0.0/google-places-mcp-arm64-macos.tar.gz"
-    sha256 "7dadabe62c9ba4fe9294c0cf4b5c46d6bd8d24ff51d82fda8d0f271c083a27f3"
+    url "https://github.com/bdombro/google-places-mcp/releases/download/v3.1.0/google-places-mcp-arm64-macos.tar.gz"
+    sha256 "9787d8fae917da212759448ea5b32ecf2c78df2b6ae7ac2fd61e6ea885ec9637"
   end
 
   on_linux do
-    url "https://github.com/bdombro/google-places-mcp/releases/download/v3.0.0/google-places-mcp-x64-linux.tar.gz"
-    sha256 "7c3b28421a98b78d35d11ac2bc4d7d09f3a0048dd58d24fd236a420b4cce934e"
+    url "https://github.com/bdombro/google-places-mcp/releases/download/v3.1.0/google-places-mcp-x64-linux.tar.gz"
+    sha256 "0574fb5f18948dd4f8932241cbd56208fb6ad616ab5007268a18eb5aaf8a81c5"
   end
 
   def install
