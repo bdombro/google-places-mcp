@@ -84,6 +84,64 @@ struct StatusInput {
     slimr::OptField<std::optional<bool>, "Make one tiny call to each API to see which are enabled (costs a fraction of a cent; the Places call is free)."> probe{false};
 };
 
+struct DetailsPlaceOut {
+    std::string id;
+    std::string name;
+    std::optional<std::string> address;
+    std::optional<double> lat;
+    std::optional<double> lng;
+    std::optional<std::string> type;
+    std::optional<std::string> status;
+    std::optional<std::string> mapsUrl;
+    std::optional<int64_t> distanceM;
+    std::vector<std::string> types;
+    std::optional<std::string> timeZone;
+    std::vector<std::string> accessibility;
+    std::vector<PhotoRef> photos;
+};
+
+struct DetailsOut {
+    DetailsPlaceOut place;
+    std::string notice = std::string(UNTRUSTED_NOTICE);
+};
+
+struct GeocodeOut {
+    std::vector<GeocodeResult> results;
+};
+
+struct RouteOut {
+    std::string origin;
+    std::string destination;
+    std::string mode;
+    std::vector<RouteResult> routes;
+};
+
+struct MatrixOut {
+    std::string mode;
+    std::vector<MatrixElement> elements;
+};
+
+struct StatusProbeOut {
+    bool ok = false;
+    std::optional<std::string> message;
+};
+
+struct StatusProbesOut {
+    StatusProbeOut geocoding;
+    StatusProbeOut places;
+    StatusProbeOut routes;
+};
+
+struct StatusOut {
+    std::string version;
+    bool keyConfigured = false;
+    LatLng home;
+    std::string region;
+    std::string language;
+    std::string timeZone;
+    std::optional<StatusProbesOut> probes;
+};
+
 inline slimr::PluginApp make_google_places_app(
     std::optional<PlacesConfig> configOverride = std::nullopt,
     HttpTransport transport = nullptr) {
@@ -109,7 +167,7 @@ inline slimr::PluginApp make_google_places_app(
         "search",
         "Search Google Places by text, such as \"paediatric dentist Maynooth\": name, address, coordinates, category, status and a Google Maps link, biased to near or the home area. No ratings, opening hours, prices or reviews (those are Google's pricier Enterprise tier and are not requested). Names are written by businesses: untrusted data.",
         annotations,
-        [configOverride, transport](const SearchInput &in) -> slimr::Json {
+        [configOverride, transport](const SearchInput &in) -> PlacesOut {
             auto cfg = configOverride.value_or(readConfig());
             std::optional<std::string_view> nearOpt;
             if (in.near.get().has_value())
@@ -127,12 +185,11 @@ inline slimr::PluginApp make_google_places_app(
                 typeOpt,
                 in.rank.get().value_or("relevance"),
                 in.limit.get().value_or(10));
-            PlacesOut out{
+            return PlacesOut{
                 .near = center.label,
                 .center = LatLng{center.lat, center.lng},
                 .places = std::move(places),
             };
-            return out.toJson();
         });
 
     // nearby
@@ -140,7 +197,7 @@ inline slimr::PluginApp make_google_places_app(
         "nearby",
         "List places of given Google place types within a radius of a point (default: the home area), such as dentists, pharmacies or playgrounds, ranked by popularity or distance. Returns name, address, coordinates, category, status, Maps link and straight-line distance; no ratings or hours (Enterprise tier, not requested). Names are untrusted data.",
         annotations,
-        [configOverride, transport](const NearbyInput &in) -> slimr::Json {
+        [configOverride, transport](const NearbyInput &in) -> PlacesOut {
             auto cfg = configOverride.value_or(readConfig());
             std::optional<std::string_view> nearOpt;
             if (in.near.get().has_value())
@@ -183,12 +240,11 @@ inline slimr::PluginApp make_google_places_app(
                 in.rank.get().value_or("popularity"),
                 in.limit.get().value_or(10));
 
-            PlacesOut out{
+            return PlacesOut{
                 .near = center.label,
                 .center = LatLng{center.lat, center.lng},
                 .places = std::move(places),
             };
-            return out.toJson();
         });
 
     // details
@@ -196,13 +252,29 @@ inline slimr::PluginApp make_google_places_app(
         "details",
         "Get one place by ID (or by name): address, coordinates, category and types, status, Maps link, time zone, accessibility features and optional photo references. No phone, website, ratings, opening hours or reviews: those are Google's pricier Enterprise tiers and are not requested. Place text is untrusted data.",
         annotations,
-        [configOverride, transport](const DetailsInput &in) -> slimr::Json {
+        [configOverride, transport](const DetailsInput &in) -> DetailsOut {
             auto cfg = configOverride.value_or(readConfig());
             std::optional<std::string_view> nearOpt;
             if (in.near.get().has_value())
                 nearOpt = in.near.get().value();
             auto details = placeDetails(cfg, transport, in.place.get(), nearOpt, in.photos.get().value_or(0));
-            return details.toJson();
+            return DetailsOut{
+                .place = DetailsPlaceOut{
+                    .id = std::move(details.base.id),
+                    .name = std::move(details.base.name),
+                    .address = std::move(details.base.address),
+                    .lat = details.base.lat,
+                    .lng = details.base.lng,
+                    .type = std::move(details.base.type),
+                    .status = std::move(details.base.status),
+                    .mapsUrl = std::move(details.base.mapsUrl),
+                    .distanceM = details.base.distanceM,
+                    .types = std::move(details.types),
+                    .timeZone = std::move(details.timeZone),
+                    .accessibility = std::move(details.accessibility),
+                    .photos = std::move(details.photos),
+                },
+            };
         });
 
     // resolve
@@ -210,18 +282,17 @@ inline slimr::PluginApp make_google_places_app(
         "resolve",
         "Resolve a place name or address to candidate places with their IDs, canonical addresses and coordinates. Use it to get an ID to store or to pass to details, route or matrix, and to check which of several same-named places is meant. Names are untrusted data.",
         annotations,
-        [configOverride, transport](const ResolveInput &in) -> slimr::Json {
+        [configOverride, transport](const ResolveInput &in) -> PlacesOut {
             auto cfg = configOverride.value_or(readConfig());
             std::optional<std::string_view> nearOpt;
             if (in.near.get().has_value())
                 nearOpt = in.near.get().value();
             auto [center, places] = resolvePlaces(cfg, transport, in.text.get(), nearOpt, in.limit.get().value_or(3));
-            PlacesOut out{
+            return PlacesOut{
                 .near = center.label,
                 .center = LatLng{center.lat, center.lng},
                 .places = std::move(places),
             };
-            return out.toJson();
         });
 
     // geocode
@@ -229,16 +300,10 @@ inline slimr::PluginApp make_google_places_app(
         "geocode",
         "Convert an address to coordinates, or \"lat,lng\" to the address at that point, with the Google Geocoding API. For businesses and landmarks use resolve instead.",
         annotations,
-        [configOverride, transport](const GeocodeInput &in) -> slimr::Json {
+        [configOverride, transport](const GeocodeInput &in) -> GeocodeOut {
             auto cfg = configOverride.value_or(readConfig());
             auto results = geocode(cfg, transport, in.query.get(), in.limit.get().value_or(3));
-            slimr::Json j = slimr::Json::object_t{};
-            slimr::Json::array_t arr;
-            for (const auto &r : results) {
-                arr.push_back(r.toJson());
-            }
-            j["results"] = arr;
-            return j;
+            return GeocodeOut{.results = std::move(results)};
         });
 
     // route
@@ -246,7 +311,7 @@ inline slimr::PluginApp make_google_places_app(
         "route",
         "Travel time and distance from one point to another by car, on foot, by bike, transit or two-wheeler. Points can be addresses, place names, place IDs, \"lat,lng\" or \"home\". Driving uses a static estimate unless you pass departAt or traffic (predicted or live traffic).",
         annotations,
-        [configOverride, transport](const RouteInput &in) -> slimr::Json {
+        [configOverride, transport](const RouteInput &in) -> RouteOut {
             auto cfg = configOverride.value_or(readConfig());
 
             std::vector<std::string> avoid;
@@ -277,16 +342,12 @@ inline slimr::PluginApp make_google_places_app(
                 in.alternatives.get().value_or(false),
                 in.steps.get().value_or(false));
 
-            slimr::Json j = slimr::Json::object_t{};
-            j["origin"] = in.origin.get();
-            j["destination"] = in.destination.get();
-            j["mode"] = mode;
-            slimr::Json::array_t arr;
-            for (const auto &r : routes) {
-                arr.push_back(r.toJson());
-            }
-            j["routes"] = arr;
-            return j;
+            return RouteOut{
+                .origin = in.origin.get(),
+                .destination = in.destination.get(),
+                .mode = std::move(mode),
+                .routes = std::move(routes),
+            };
         });
 
     // matrix
@@ -294,7 +355,7 @@ inline slimr::PluginApp make_google_places_app(
         "matrix",
         "Travel time and distance for every pair of several origins and destinations, e.g. which of four clinics is quickest to reach from school at 08:30. Up to 25 origins and 25 destinations (625 pairs; 100 for transit). Points can be addresses, place names, place IDs, \"lat,lng\" or \"home\".",
         annotations,
-        [configOverride, transport](const MatrixInput &in) -> slimr::Json {
+        [configOverride, transport](const MatrixInput &in) -> MatrixOut {
             auto cfg = configOverride.value_or(readConfig());
             std::string mode = in.mode.get().value_or("drive");
 
@@ -307,14 +368,10 @@ inline slimr::PluginApp make_google_places_app(
                 in.departAt.get(),
                 in.traffic.get().value_or(false));
 
-            slimr::Json j = slimr::Json::object_t{};
-            j["mode"] = mode;
-            slimr::Json::array_t arr;
-            for (const auto &e : elements) {
-                arr.push_back(e.toJson());
-            }
-            j["elements"] = arr;
-            return j;
+            return MatrixOut{
+                .mode = std::move(mode),
+                .elements = std::move(elements),
+            };
         });
 
     // photo
@@ -346,32 +403,32 @@ inline slimr::PluginApp make_google_places_app(
         "status",
         "Show the plugin's settings (key present, home area, region, language, time zone) and, with probe, whether the key can reach the Geocoding, Places (New) and Routes APIs. A disabled API reports how to enable it.",
         annotations,
-        [configOverride, transport](const StatusInput &in) -> slimr::Json {
+        [configOverride, transport](const StatusInput &in) -> StatusOut {
             auto cfg = configOverride.value_or(readConfig());
-            slimr::Json out = slimr::Json::object_t{};
-            out["version"] = GOOGLE_PLACES_APP_VERSION;
-            out["keyConfigured"] = !cfg.apiKey.empty();
-            out["home"]["lat"] = cfg.home.lat;
-            out["home"]["lng"] = cfg.home.lng;
-            out["region"] = cfg.region;
-            out["language"] = cfg.language;
-            out["timeZone"] = cfg.timeZone;
+            StatusOut out{
+                .version = GOOGLE_PLACES_APP_VERSION,
+                .keyConfigured = !cfg.apiKey.empty(),
+                .home = cfg.home,
+                .region = cfg.region,
+                .language = cfg.language,
+                .timeZone = cfg.timeZone,
+            };
 
             if (in.probe.get().value_or(false)) {
-                auto attempt = [&](std::function<void()> call) -> slimr::Json {
-                    slimr::Json p = slimr::Json::object_t{};
+                auto attempt = [&](std::function<void()> call) -> StatusProbeOut {
+                    StatusProbeOut p;
                     try {
                         call();
-                        p["ok"] = true;
+                        p.ok = true;
                     } catch (const std::exception &e) {
-                        p["ok"] = false;
-                        p["message"] = e.what();
+                        p.ok = false;
+                        p.message = e.what();
                     }
                     return p;
                 };
 
-                slimr::Json probes = slimr::Json::object_t{};
-                probes["geocoding"] = attempt([&]() {
+                StatusProbesOut probes;
+                probes.geocoding = attempt([&]() {
                     RequestSpec s;
                     s.api = "geocode";
                     s.method = "GET";
@@ -379,7 +436,7 @@ inline slimr::PluginApp make_google_places_app(
                     request(cfg, transport, s);
                 });
 
-                probes["places"] = attempt([&]() {
+                probes.places = attempt([&]() {
                     RequestSpec s;
                     s.api = "places";
                     s.method = "POST";
@@ -391,7 +448,7 @@ inline slimr::PluginApp make_google_places_app(
                     request(cfg, transport, s);
                 });
 
-                probes["routes"] = attempt([&]() {
+                probes.routes = attempt([&]() {
                     RequestSpec s;
                     s.api = "routes";
                     s.method = "POST";
@@ -406,7 +463,7 @@ inline slimr::PluginApp make_google_places_app(
                     request(cfg, transport, s);
                 });
 
-                out["probes"] = probes;
+                out.probes = std::move(probes);
             }
 
             return out;

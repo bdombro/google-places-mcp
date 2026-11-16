@@ -79,7 +79,7 @@ with implemented behavior; do not claim unverified release or client support.
 | Run unit & mock-HTTP tests (ASan + UBSan, no network) | `just test` |
 | Build release binary (`build/bin/google-places-mcp`) | `just build` |
 | Check formatting and run clang-tidy | `just lint` |
-| Verify isolated July MCP discovery over stdio and ephemeral HTTP | `just test-mcp` |
+| Verify isolated July MCP discovery over ephemeral HTTP | `just test-mcp` |
 | Clean build artifacts | `just clean` |
 
 ## Module Boundaries

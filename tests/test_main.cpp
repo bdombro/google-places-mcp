@@ -1038,6 +1038,12 @@ TEST_SUITE("commands") {
             toolNames.push_back(name);
             CHECK(def.inputSchema["type"].get<std::string>() == "object");
             CHECK(def.inputSchema["additionalProperties"].get<bool>() == false);
+            if (name == "photo") {
+                CHECK(!def.outputSchema.has_value());
+            } else {
+                REQUIRE(def.outputSchema.has_value());
+                CHECK((*def.outputSchema)["type"].get<std::string>() == "object");
+            }
         }
         std::sort(toolNames.begin(), toolNames.end());
         std::vector<std::string> expected = {

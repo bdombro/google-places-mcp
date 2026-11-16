@@ -58,7 +58,7 @@ Add to `.mcp.json`:
 }
 ```
 
-Or run over stdio (`google-places-mcp mcp`) or direct CLI (`google-places-mcp search '{"query":"pharmacy"}'`). Pass `--skip-checks` to bypass startup env validation when inspecting discovery or running offline commands.
+Or run via direct CLI (`google-places-mcp search '{"query":"pharmacy"}'`). Pass `--skip-checks` to bypass startup env validation when inspecting discovery or running offline commands.
 
 ## Tools
 

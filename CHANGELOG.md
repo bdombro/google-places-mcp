@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Migrate fixed-shape JSON tool handlers to `slimr-serve` typed `OutputStruct` (keeping `photo` on `McpResult`) and drop stdio `mcp` mode.
 - Fix direct CLI tool calls (`<bin> <tool> '{...}'`), disabled by default since `slimr-mcp` v0.1.4
 - Internal: replace `slimr-curl` with `cpp-httplib` and upgrade `slimr-mcp` / `slimr-bugsink`.
 - Internal: switch macOS builds to llvm@23 with static libc++ and symbol hiding.
