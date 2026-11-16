@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Internal: switch macOS builds to llvm@23 with static libc++ and symbol hiding.
+
 ## v3.0.0 - 2026-11-16
 
 - Require `GOOGLE_PLACES_API_KEY` at startup (bypass with `--skip-checks`) and stop reading API keys from `config.json` or the `GOOGLE_PLACE_API_KEY` alias

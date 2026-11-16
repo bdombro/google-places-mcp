@@ -23,7 +23,7 @@ Run the direct binary on a separate dev port:
 
 - Set `VCPKG_ROOT` to a bootstrapped vcpkg checkout; dependencies install into `build/deps/` from the `slimr-*` vcpkg registries.
 - `LLVM_BIN` overrides `$(brew --prefix llvm@23)/bin` for `clang-format` and `clang-tidy`.
-- macOS builds use Apple clang (`/usr/bin/clang++`) with a `15.0` deployment target (`otool -L` must show no Homebrew library paths).
+- macOS builds use Homebrew `llvm@23` (`clang`/`clang++`) with static `libc++` and symbol hiding at a `15.0` deployment target (`otool -L` must show only system libraries).
 - Linux (`ubuntu-24.04`) builds use Homebrew `llvm@23` clang++ with libc++ (static libc++ in Release) and `systemd --user` via `brew services` (`loginctl enable-linger "$USER"`).
 
 ## Release
