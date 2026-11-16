@@ -329,7 +329,7 @@ inline slimr::PluginApp make_google_places_app(
                 HttpCall imgReq;
                 imgReq.method = "GET";
                 imgReq.url = uri;
-                auto imgResp = transport ? transport(imgReq) : default_curl_transport(imgReq);
+                auto imgResp = transport ? transport(imgReq) : default_http_transport(imgReq);
                 std::string b64 = base64_encode(imgResp.body);
                 return slimr::McpResult::image(b64, "image/jpeg");
             }

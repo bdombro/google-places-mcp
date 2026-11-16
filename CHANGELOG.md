@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Internal: replace `slimr-curl` with `cpp-httplib` and upgrade `slimr-mcp` / `slimr-bugsink`.
 - Internal: switch macOS builds to llvm@23 with static libc++ and symbol hiding.
 
 ## v3.0.0 - 2026-11-16

@@ -1,10 +1,11 @@
 #pragma once
 
-#include "curl.hpp"
 #include "json.hpp"
 #include "types.hpp"
 #include "util.hpp"
+#include <httplib.h>
 
+#include <algorithm>
 #include <functional>
 #include <map>
 #include <optional>
@@ -34,26 +35,58 @@ struct HttpCallResponse {
 
 using HttpTransport = std::function<HttpCallResponse(const HttpCall &)>;
 
-inline HttpCallResponse default_curl_transport(const HttpCall &req) {
-    slimr::HttpRequest r;
-    r.method = req.method;
-    r.url = req.url;
-    r.headers = req.headers;
-    r.body = req.body;
-    r.timeoutMs = 20000;
+inline HttpCallResponse default_http_transport(const HttpCall &req) {
+    auto schemePos = req.url.find("://");
+    if (schemePos == std::string::npos) {
+        throw GoogleError("Network error: invalid URL");
+    }
+    auto pathPos = req.url.find('/', schemePos + 3);
+    auto queryPos = req.url.find('?', schemePos + 3);
+    auto splitPos = std::min(pathPos, queryPos);
+    std::string base = splitPos == std::string::npos ? req.url : req.url.substr(0, splitPos);
+    std::string pathAndQuery = "/";
+    if (splitPos != std::string::npos) {
+        pathAndQuery = req.url[splitPos] == '?' ? "/" + req.url.substr(splitPos) : req.url.substr(splitPos);
+    }
 
-    try {
-        auto resp = slimr::request(r);
-        return HttpCallResponse{.status = resp.status, .body = std::move(resp.body)};
-    } catch (const std::exception &e) {
-        std::string msg = e.what();
-        if (msg.find("timeout") != std::string::npos ||
-            msg.find("timed out") != std::string::npos ||
-            msg.find("28") != std::string::npos) {
+    httplib::Client cli(base);
+    if (!cli.is_valid()) {
+        throw GoogleError("Network error: invalid URL");
+    }
+    cli.set_connection_timeout(20, 0);
+    cli.set_read_timeout(20, 0);
+    cli.set_write_timeout(20, 0);
+    cli.set_follow_location(true);
+
+    httplib::Headers headers;
+    std::string contentType;
+    for (const auto &[k, v] : req.headers) {
+        if (k == "Content-Type" || k == "content-type") {
+            contentType = v;
+        } else {
+            headers.emplace(k, v);
+        }
+    }
+
+    httplib::Result res;
+    if (req.method == "POST") {
+        res = cli.Post(pathAndQuery, headers, req.body, contentType);
+    } else if (req.method == "GET") {
+        res = cli.Get(pathAndQuery, headers);
+    } else {
+        throw GoogleError("Network error: unsupported HTTP method " + req.method);
+    }
+
+    if (!res) {
+        auto err = res.error();
+        if (err == httplib::Error::ConnectionTimeout || err == httplib::Error::Timeout ||
+            err == httplib::Error::Read || err == httplib::Error::Write) {
             throw GoogleError("Google did not answer within 20 s.");
         }
-        throw GoogleError("Network error: " + msg);
+        throw GoogleError("Network error: " + httplib::to_string(err));
     }
+
+    return HttpCallResponse{.status = res->status, .body = std::move(res->body)};
 }
 
 inline std::string scrub(std::string_view text, std::string_view key) {
@@ -158,7 +191,7 @@ struct RequestSpec {
 
 inline slimr::Json request(const PlacesConfig &config, HttpTransport transport, const RequestSpec &spec) {
     if (!transport) {
-        transport = default_curl_transport;
+        transport = default_http_transport;
     }
 
     const std::string &key = config.apiKey;
@@ -182,9 +215,9 @@ inline slimr::Json request(const PlacesConfig &config, HttpTransport transport, 
     auto addQuery = [&](std::string_view k, std::string_view v) {
         fullUrl += hasQuery ? '&' : '?';
         hasQuery = true;
-        fullUrl += slimr::url_encode(k);
+        fullUrl += httplib::encode_uri_component(std::string(k));
         fullUrl += '=';
-        fullUrl += slimr::url_encode(v);
+        fullUrl += httplib::encode_uri_component(std::string(v));
     };
 
     for (const auto &[k, v] : spec.query) {
