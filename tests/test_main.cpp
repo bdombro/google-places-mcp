@@ -9,6 +9,7 @@
 #include "google_client.hpp"
 #include "places.hpp"
 #include "routes.hpp"
+#include "test_log_file.hpp"
 #include "types.hpp"
 #include "util.hpp"
 
