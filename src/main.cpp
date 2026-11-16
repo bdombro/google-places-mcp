@@ -71,7 +71,7 @@ int main(int argc, char *argv[]) try {
     }
 
     auto app = google_places::make_google_places_app();
-    slimr::enable_http(app, slimr::HttpServerOptions{.host = "127.0.0.1", .port = 10004});
+    slimr::enable_http(app, slimr::HttpServerOptions{.port = 10004});
     return app.run(static_cast<int>(filteredArgv.size()), filteredArgv.data());
 } catch (const std::exception &e) {
     std::cerr << "google-places-mcp: fatal: " << e.what() << "\n";
