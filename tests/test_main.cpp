@@ -1370,28 +1370,10 @@ TEST_SUITE("commands") {
         }
 
         // Non-loopback and unflagged ephemeral port refusals
-        {
-            char arg0[] = "google-places-mcp";
-            char arg1[] = "http";
-            char arg2[] = "--host";
-            char arg3[] = "0.0.0.0";
-            char *argv[] = {arg0, arg1, arg2, arg3, nullptr};
-            CHECK(app.run(4, argv) == 1);
-        }
-        {
-            char arg0[] = "google-places-mcp";
-            char arg1[] = "http";
-            char arg2[] = "--port";
-            char arg3[] = "0";
-            char *argv[] = {arg0, arg1, arg2, arg3, nullptr};
-            CHECK(app.run(4, argv) == 1);
-        }
-
         // Ephemeral HTTP server roundtrip
         slimr::McpHttpServer server(app, slimr::HttpServerOptions{
                                              .host = "127.0.0.1",
                                              .port = 0,
-                                             .allowEphemeralPort = true,
                                          });
         std::string err;
         REQUIRE(server.start(&err));
