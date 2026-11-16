@@ -1433,4 +1433,35 @@ TEST_SUITE("commands") {
         CHECK(fileOverrides["PLACES_REGION"] == "gb");
         CHECK(fileOverrides["PLACES_LANGUAGE"] == "en-GB");
     }
+
+    TEST_CASE("defaultConfigPath uses GOOGLE_PLACES_CONFIG or HOMEBREW_PREFIX/etc/google-places-mcp") {
+        struct EnvGuard {
+            std::string name;
+            std::optional<std::string> prev;
+            EnvGuard(std::string n, const char *val) : name(std::move(n)) {
+                if (const char *old = std::getenv(name.c_str())) {
+                    prev = std::string(old);
+                }
+                if (val) {
+                    ::setenv(name.c_str(), val, 1);
+                } else {
+                    ::unsetenv(name.c_str());
+                }
+            }
+            ~EnvGuard() {
+                if (prev.has_value()) {
+                    ::setenv(name.c_str(), prev->c_str(), 1);
+                } else {
+                    ::unsetenv(name.c_str());
+                }
+            }
+        };
+
+        EnvGuard cfgGuard("GOOGLE_PLACES_CONFIG", nullptr);
+        EnvGuard brewGuard("HOMEBREW_PREFIX", "/tmp/places-brew/");
+        CHECK(defaultConfigPath() == std::filesystem::path("/tmp/places-brew/etc/google-places-mcp/config.json"));
+
+        ::setenv("GOOGLE_PLACES_CONFIG", "/tmp/custom-places.json", 1);
+        CHECK(defaultConfigPath() == std::filesystem::path("/tmp/custom-places.json"));
+    }
 }
