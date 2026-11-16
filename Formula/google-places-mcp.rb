@@ -2,37 +2,42 @@ class GooglePlacesMcp < Formula
   desc "Google Places, Routes, and Geocoding MCP server (Pro tier and below)"
   homepage "https://github.com/bdombro/google-places-mcp"
   version "2.0.0"
-  license "MIT"
 
-  url "https://github.com/bdombro/google-places-mcp/releases/download/v2.0.0/google-places-mcp-v2.0.0-darwin-arm64.tar.gz"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  on_macos do
+    url "https://github.com/bdombro/google-places-mcp/releases/download/v2.0.0/google-places-mcp-arm64-macos.tar.gz"
+    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  end
+
+  on_linux do
+    url "https://github.com/bdombro/google-places-mcp/releases/download/v2.0.0/google-places-mcp-x64-linux.tar.gz"
+    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  end
 
   def install
     bin.install "google-places-mcp"
+    chmod 0755, bin/"google-places-mcp"
+    pkgshare.install "docs" if File.directory?("docs")
+  end
+
+  def post_install
+    (var/"google-places-mcp").mkpath
+    chmod 0700, var/"google-places-mcp"
+    (var/"log").mkpath
   end
 
   service do
-    run [opt_bin/"google-places-mcp", "http", "--host", "127.0.0.1", "--port", "10004"]
+    run ["/bin/sh", "-c", "[ -f #{etc}/google-places-mcp/env ] && set -a && . #{etc}/google-places-mcp/env; exec #{opt_bin}/google-places-mcp http --log-file #{var}/log/google-places-mcp.log"]
     keep_alive true
+    working_dir var/"google-places-mcp"
     log_path var/"log/google-places-mcp.log"
     error_log_path var/"log/google-places-mcp.log"
-  end
-
-  def caveats
-    <<~EOS
-      HTTP MCP endpoint:
-        http://127.0.0.1:10004/mcp
-
-      Configure your Google Maps API key for the LaunchAgent in:
-        ~/.config/google-places/config.json
-      Example:
-        {"apiKey":"YOUR_KEY","home":"53.3813,-6.5918","region":"ie","language":"en","timeZone":"Europe/Dublin"}
-      Or set GOOGLE_PLACES_API_KEY in the LaunchAgent / environment (or load from macOS Keychain into config.json).
-    EOS
+    environment_variables PATH: "#{HOMEBREW_PREFIX}/bin:/usr/bin:/bin"
   end
 
   test do
-    output = shell_output("#{bin}/google-places-mcp status")
-    assert_match "keyConfigured", output
+    assert_match version.to_s, shell_output("#{bin}/google-places-mcp --version")
+    discover = '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
+    out = pipe_output("#{bin}/google-places-mcp mcp --skip-checks", "#{discover}\n")
+    assert_match "google-places-mcp", out
   end
 end
