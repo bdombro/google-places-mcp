@@ -1,4 +1,11 @@
-Checks: '-*,clang-analyzer-core.*,clang-analyzer-cplusplus.NewDelete,bugprone-dangling-handle,bugprone-sizeof-expression'
+# Pending lint follow-ups (enable one check per reviewed commit):
+#   -bugprone-unchecked-optional-access (23 findings)
+#   -bugprone-narrowing-conversions (6 findings)
+#   -bugprone-optional-value-conversion (2 findings)
+#   -bugprone-exception-escape (1 finding)
+#   -bugprone-implicit-widening-of-multiplication-result (1 finding)
+#   -clang-analyzer-cplusplus.NewDeleteLeaks (1 finding)
+Checks: '-*,clang-analyzer-core.*,clang-analyzer-cplusplus.*,bugprone-*,-bugprone-easily-swappable-parameters,-bugprone-signed-bitwise,-bugprone-throwing-static-initialization,-bugprone-reserved-identifier,-bugprone-branch-clone,-bugprone-macro-parentheses,-bugprone-lambda-function-name,-bugprone-std-exception-baseclass,-bugprone-switch-missing-default-case,-bugprone-argument-comment,-bugprone-unintended-char-ostream-output,-bugprone-unchecked-optional-access,-bugprone-narrowing-conversions,-bugprone-optional-value-conversion,-bugprone-exception-escape,-bugprone-implicit-widening-of-multiplication-result,-clang-analyzer-cplusplus.NewDeleteLeaks'
 WarningsAsErrors: '*'
 HeaderFilterRegex: '[/\\](src|tests)[/\\]'
 SystemHeaders: false
