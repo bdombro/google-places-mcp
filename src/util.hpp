@@ -380,8 +380,6 @@ inline std::string base64_encode(std::string_view in) {
 template <typename Getter>
 inline PlacesConfig readConfigWith(Getter &&get) {
     std::string key = get("GOOGLE_PLACES_API_KEY");
-    if (key.empty())
-        key = get("GOOGLE_PLACE_API_KEY");
     size_t ks = key.find_first_not_of(" \t\r\n");
     if (ks != std::string::npos)
         key = key.substr(ks, key.find_last_not_of(" \t\r\n") - ks + 1);

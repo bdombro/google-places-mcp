@@ -431,8 +431,8 @@ TEST_SUITE("google_client") {
         CHECK(transport.calls.empty());
     }
 
-    TEST_CASE("readConfig reads either key name, with defaults") {
-        CHECK(readConfig({{"GOOGLE_PLACE_API_KEY", "abc"}}).apiKey == "abc");
+    TEST_CASE("readConfig reads GOOGLE_PLACES_API_KEY, with defaults") {
+        CHECK(readConfig({{"GOOGLE_PLACE_API_KEY", "abc"}}).apiKey.empty());
         CHECK(readConfig({{"GOOGLE_PLACES_API_KEY", "xyz"}, {"GOOGLE_PLACE_API_KEY", "abc"}}).apiKey == "xyz");
         auto empty = readConfig(std::map<std::string, std::string>{});
         CHECK(empty.apiKey == "");
