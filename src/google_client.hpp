@@ -163,7 +163,7 @@ inline slimr::Json request(const PlacesConfig &config, HttpTransport transport, 
 
     const std::string &key = config.apiKey;
     if (key.empty()) {
-        throw GoogleError("GOOGLE_PLACES_API_KEY is not set (GOOGLE_PLACE_API_KEY also works). Add it to your login shell.");
+        throw GoogleError("GOOGLE_PLACES_API_KEY is not set.");
     }
 
     static const std::map<std::string, std::string> BASES = {

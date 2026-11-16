@@ -82,7 +82,7 @@ Or run over stdio (`google-places-mcp mcp`) or direct CLI (`google-places-mcp se
 
 | Name | Required | Default | Purpose |
 | --- | --- | --- | --- |
-| `GOOGLE_PLACES_API_KEY` | Yes | none (`GOOGLE_PLACE_API_KEY` also read) | Google Cloud API key for Places (New), Routes, and Geocoding |
+| `GOOGLE_PLACES_API_KEY` | Yes | none | Google Cloud API key for Places (New), Routes, and Geocoding |
 | `PLACES_HOME` | Optional | `53.3813,-6.5918` | Default `"lat,lng"` for search bias and `"home"` in routes |
 | `PLACES_REGION` | Optional | `ie` | CLDR region code for search bias |
 | `PLACES_LANGUAGE` | Optional | `en` | BCP-47 language code for returned names and addresses |
