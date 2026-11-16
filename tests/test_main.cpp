@@ -1365,12 +1365,12 @@ TEST_SUITE("commands") {
         // Guarded CLI invocation without HTTP flag
         {
             char arg0[] = "google-places-mcp";
-            char arg1[] = "status";
-            char *argv[] = {arg0, arg1, nullptr};
-            CHECK(app.run(2, argv) == 0);
+            char arg1[] = "--skip-checks";
+            char arg2[] = "status";
+            char *argv[] = {arg0, arg1, arg2, nullptr};
+            CHECK(app.run(3, argv) == 0);
         }
 
-        // Non-loopback and unflagged ephemeral port refusals
         // Ephemeral HTTP server roundtrip
         slimr::McpHttpServer server(app, slimr::HttpServerOptions{
                                              .host = "127.0.0.1",
@@ -1420,7 +1420,7 @@ TEST_SUITE("commands") {
 
         server.stop();
 
-        // Optional JSON config file overrides for LaunchAgent / brew services
+        // Optional JSON config file overrides for LaunchAgent / brew services (secrets stay in env vars)
         const auto cfgPath = std::filesystem::temp_directory_path() / "google-places-test-config.json";
         {
             std::ofstream out(cfgPath);
@@ -1429,9 +1429,69 @@ TEST_SUITE("commands") {
         auto fileOverrides = loadConfigFileOverrides(cfgPath);
         std::error_code ec;
         std::filesystem::remove(cfgPath, ec);
-        CHECK(fileOverrides["GOOGLE_PLACES_API_KEY"] == "file-key-999");
+        CHECK(fileOverrides.find("GOOGLE_PLACES_API_KEY") == fileOverrides.end());
         CHECK(fileOverrides["PLACES_REGION"] == "gb");
         CHECK(fileOverrides["PLACES_LANGUAGE"] == "en-GB");
+    }
+
+    TEST_CASE("startup requires GOOGLE_PLACES_API_KEY unless --skip-checks, --version, or --help") {
+        struct KeyEnvGuard {
+            std::optional<std::string> prev;
+            explicit KeyEnvGuard(const char *val) {
+                if (const char *old = std::getenv("GOOGLE_PLACES_API_KEY")) {
+                    prev = std::string(old);
+                }
+                if (val) {
+                    ::setenv("GOOGLE_PLACES_API_KEY", val, 1);
+                } else {
+                    ::unsetenv("GOOGLE_PLACES_API_KEY");
+                }
+            }
+            ~KeyEnvGuard() {
+                if (prev.has_value()) {
+                    ::setenv("GOOGLE_PLACES_API_KEY", prev->c_str(), 1);
+                } else {
+                    ::unsetenv("GOOGLE_PLACES_API_KEY");
+                }
+            }
+        };
+
+        auto app = make_google_places_app(TEST_CONFIG);
+        KeyEnvGuard missing(nullptr);
+
+        {
+            char arg0[] = "google-places-mcp";
+            char arg1[] = "status";
+            char *argv[] = {arg0, arg1, nullptr};
+            CHECK(app.run(2, argv) != 0);
+        }
+        {
+            char arg0[] = "google-places-mcp";
+            char arg1[] = "--skip-checks";
+            char arg2[] = "status";
+            char *argv[] = {arg0, arg1, arg2, nullptr};
+            CHECK(app.run(3, argv) == 0);
+        }
+        {
+            char arg0[] = "google-places-mcp";
+            char arg1[] = "--version";
+            char *argv[] = {arg0, arg1, nullptr};
+            CHECK(app.run(2, argv) == 0);
+        }
+        {
+            char arg0[] = "google-places-mcp";
+            char arg1[] = "--help";
+            char *argv[] = {arg0, arg1, nullptr};
+            CHECK(app.run(2, argv) == 0);
+        }
+
+        ::setenv("GOOGLE_PLACES_API_KEY", "test-key", 1);
+        {
+            char arg0[] = "google-places-mcp";
+            char arg1[] = "status";
+            char *argv[] = {arg0, arg1, nullptr};
+            CHECK(app.run(2, argv) == 0);
+        }
     }
 
     TEST_CASE("defaultConfigPath uses GOOGLE_PLACES_CONFIG or HOMEBREW_PREFIX/etc/google-places-mcp") {

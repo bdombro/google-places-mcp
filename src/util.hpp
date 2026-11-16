@@ -600,8 +600,6 @@ inline std::map<std::string, std::string> loadConfigFileOverrides(const std::fil
             }
         }
     };
-    readAlias("GOOGLE_PLACES_API_KEY", "apiKey");
-    readAlias("GOOGLE_PLACE_API_KEY", nullptr);
     readAlias("PLACES_HOME", "home");
     readAlias("PLACES_REGION", "region");
     readAlias("PLACES_LANGUAGE", "language");
