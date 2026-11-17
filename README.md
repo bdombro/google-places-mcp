@@ -92,4 +92,4 @@ Or run via direct CLI (`google-places-mcp search '{"query":"pharmacy"}'`). Pass 
 
 ## Development
 
-See [docs/development.md](docs/development.md) for local builds, testing, and releases.
+See [docs/contributing.md](docs/contributing.md) for local builds, testing, and releases.
