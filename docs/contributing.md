@@ -166,6 +166,7 @@ Run the direct binary on a separate dev port:
 
 ```bash
 ./build/bin/google-places-mcp http --port 20004
+curl -X POST http://127.0.0.1:20004/tools/status -d '{}'
 ```
 
 - Set `VCPKG_ROOT` to a bootstrapped vcpkg checkout; dependencies install into `build/deps/` from the `slimr-*` vcpkg registries.

@@ -2,7 +2,7 @@
 
 Written for: AI coding agents working in the `google-places-mcp` C++26 plugin repository.
 
-`google-places-mcp` is a C++26 MCP plugin and CLI built on `slimr-*` wrapping the Google Places API (New), Routes API v2, and Geocoding API over `cpp-httplib`, strictly locked to **Pro tier and below**.
+`google-places-mcp` is a C++26 MCP server built on `slimr-*` wrapping the Google Places API (New), Routes API v2, and Geocoding API over `cpp-httplib`, strictly locked to **Pro tier and below**.
 
 <!-- cpp-templates:begin -->
 <!-- cpp-templates:commit c746b02c9f5b17b63c4921e6adff7fa8c5f6dc37 -->
