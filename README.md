@@ -43,7 +43,7 @@ brew services start google-places-mcp
 brew services info google-places-mcp
 ```
 
-The HTTP server binds `0.0.0.0:10004` (`http://127.0.0.1:10004/mcp` locally), uses `$(brew --prefix)/var/google-places-mcp`, and logs to `$(brew --prefix)/var/log/google-places-mcp.log` (rotated at 10 MiB, keeping one `.1`).
+The HTTP server binds `127.0.0.1:10004` by default (`http://127.0.0.1:10004/mcp`; pass `--host 0.0.0.0` to expose), uses `$(brew --prefix)/var/google-places-mcp`, and logs to `$(brew --prefix)/var/log/google-places-mcp.log` (rotated at 10 MiB, keeping one `.1`).
 
 Add to `.mcp.json`:
 

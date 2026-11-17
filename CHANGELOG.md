@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Serve OpenAPI 3.1 spec at `GET /openapi.json` and dump via `--openapi` (`slimr-serve` / `slimr-mcp` upgrade).
+- Default HTTP bind host is now `127.0.0.1` instead of `0.0.0.0` (pass `--host 0.0.0.0` to expose).
+- Internal: verify `GET /openapi.json` in `test-mcp.ts` and document `overlay-ports` workflow in `docs/development.md`.
+
 ## v3.1.0 - 2026-11-16
 
 - Migrate fixed-shape JSON tool handlers to `slimr-serve` typed `OutputStruct` (keeping `photo` on `McpResult`) and drop stdio `mcp` mode.
