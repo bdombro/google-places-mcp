@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## v3.1.2 - 2026-11-17
+
+- feat: align cpp-templates CI/CD, expose /tools endpoints, and bump slimr baselines (#1)
+  * build: guard release against VCPKG_OVERLAY_PORTS and update dev docs
+  * chore: adopt cpp-templates CI/CD and contributing docs
+  * docs: maintainer setup for release App, secrets, rulesets
+  * docs: soft alignment marker and release-bot contributing docs
+  * feat: drop per-tool CLI and expose /tools endpoints by default
+  * chore: bump slimr-serve v0.3.1 and slimr-mcp v0.2.2 baselines
+- chore: slow gh run watch polling to 30s
+
 - Drop per-tool CLI, `--openapi`, and `--tools`; binaries are server-only and expose `/tools/<name>` HTTP endpoints by default.
 
 ## v3.1.1 - 2026-11-17
