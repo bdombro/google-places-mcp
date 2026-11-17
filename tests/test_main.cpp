@@ -22,6 +22,7 @@
 #include <netinet/in.h>
 #include <poll.h>
 #include <set>
+#include <sstream>
 #include <string>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -1298,7 +1299,7 @@ TEST_SUITE("commands") {
         CHECK(statusTransport.calls.size() == 3);
     }
 
-    TEST_CASE("http transport, server/discover, tools/list, CLI, and config fallback") {
+    TEST_CASE("http transport, server/discover, tools/list, /tools, and config fallback") {
         struct LoopbackFd {
             int fd{-1};
             ~LoopbackFd() {
@@ -1310,8 +1311,9 @@ TEST_SUITE("commands") {
             LoopbackFd() = default;
         };
 
-        auto postMcp = [](uint16_t port, std::string_view method, std::string_view body,
-                          std::string_view toolName = {}) -> std::pair<int, Json> {
+        auto httpCall = [](uint16_t port, std::string_view httpMethod, std::string_view path,
+                           std::string_view body = {}, std::string_view mcpMethod = {},
+                           std::string_view toolName = {}) -> std::pair<int, Json> {
             LoopbackFd sock;
             sock.fd = ::socket(AF_INET, SOCK_STREAM, 0);
             REQUIRE(sock.fd >= 0);
@@ -1322,17 +1324,27 @@ TEST_SUITE("commands") {
             REQUIRE(::inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr) == 1);
             REQUIRE(::connect(sock.fd, reinterpret_cast<const sockaddr *>(&addr), sizeof(addr)) == 0);
 
-            std::string req = "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:" + std::to_string(port) + "\r\n"
-                                                                                                "Content-Type: application/json\r\n"
-                                                                                                "Accept: application/json, text/event-stream\r\n"
-                                                                                                "MCP-Protocol-Version: 2026-07-28\r\n"
-                                                                                                "Mcp-Method: " +
-                              std::string(method) + "\r\n";
-            if (!toolName.empty()) {
-                req += "Mcp-Name: " + std::string(toolName) + "\r\n";
+            std::string req = std::string(httpMethod) + " " + std::string(path) +
+                              " HTTP/1.1\r\nHost: 127.0.0.1:" + std::to_string(port) + "\r\n";
+            if (!mcpMethod.empty()) {
+                req += "Content-Type: application/json\r\n"
+                       "Accept: application/json, text/event-stream\r\n"
+                       "MCP-Protocol-Version: 2026-07-28\r\n"
+                       "Mcp-Method: " +
+                       std::string(mcpMethod) + "\r\n";
+                if (!toolName.empty()) {
+                    req += "Mcp-Name: " + std::string(toolName) + "\r\n";
+                }
+            } else if (httpMethod == "POST") {
+                req += "Content-Type: application/json\r\n";
             }
-            req += "Content-Length: " + std::to_string(body.size()) + "\r\nConnection: close\r\n\r\n";
-            req += body;
+            if (httpMethod == "POST") {
+                req += "Content-Length: " + std::to_string(body.size()) + "\r\n";
+            }
+            req += "Connection: close\r\n\r\n";
+            if (httpMethod == "POST") {
+                req += body;
+            }
 
             size_t sent = 0;
             while (sent < req.size()) {
@@ -1361,20 +1373,45 @@ TEST_SUITE("commands") {
             if (payload.empty())
                 return {status, Json()};
             auto parsed = slimr::parse_json(payload);
-            REQUIRE(parsed.has_value());
+            if (!parsed.has_value())
+                return {status, Json()};
             return {status, std::move(*parsed)};
+        };
+
+        auto postMcp = [&](uint16_t port, std::string_view method, std::string_view body,
+                           std::string_view toolName = {}) -> std::pair<int, Json> {
+            return httpCall(port, "POST", "/mcp", body, method, toolName);
         };
 
         auto app = make_google_places_app(TEST_CONFIG);
         slimr::enable_http(app, slimr::HttpServerOptions{.host = "127.0.0.1", .port = 10004});
 
-        // Guarded CLI invocation without HTTP flag
+        // Server-only CLI rejects per-tool commands and removed flags
         {
+            std::ostringstream out, err;
             char arg0[] = "google-places-mcp";
             char arg1[] = "--skip-checks";
             char arg2[] = "status";
             char *argv[] = {arg0, arg1, arg2, nullptr};
-            CHECK(app.run(3, argv) == 0);
+            CHECK(app.run(3, argv, out, err) != 0);
+        }
+        {
+            std::ostringstream out, err;
+            char arg0[] = "google-places-mcp";
+            char arg1[] = "--"
+                          "openapi";
+            char *argv[] = {arg0, arg1, nullptr};
+            CHECK(app.run(2, argv, out, err) != 0);
+        }
+        {
+            std::ostringstream out, err;
+            char arg0[] = "google-places-mcp";
+            char arg1[] = "--skip-checks";
+            char arg2[] = "http";
+            char arg3[] = "--"
+                          "tools";
+            char *argv[] = {arg0, arg1, arg2, arg3, nullptr};
+            CHECK(app.run(4, argv, out, err) != 0);
         }
 
         // Ephemeral HTTP server roundtrip
@@ -1386,6 +1423,21 @@ TEST_SUITE("commands") {
         REQUIRE(server.start(&err));
         const uint16_t port = server.boundPort();
         CHECK(port > 0);
+
+        // Root tool/OpenAPI/schema routes are 404; /tools/* are mounted by default
+        CHECK(httpCall(port, "GET", "/openapi.json").first == 404);
+        CHECK(httpCall(port, "GET", "/schema").first == 404);
+        CHECK(httpCall(port, "POST", "/status", "{}").first == 404);
+
+        auto [toolsOpenapiStatus, toolsOpenapi] = httpCall(port, "GET", "/tools/openapi.json");
+        CHECK(toolsOpenapiStatus == 200);
+        CHECK(toolsOpenapi["paths"].contains("/tools/status"));
+        CHECK(toolsOpenapi["paths"]["/tools/status"].contains("post"));
+        CHECK(httpCall(port, "GET", "/tools/schema").first == 200);
+
+        auto [toolHttpStatus, toolHttpBody] = httpCall(port, "POST", "/tools/status", "{}");
+        CHECK(toolHttpStatus == 200);
+        CHECK(toolHttpBody["keyConfigured"].get<bool>());
 
         constexpr std::string_view kMeta =
             R"("_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}})";
@@ -1463,40 +1515,53 @@ TEST_SUITE("commands") {
         };
 
         auto app = make_google_places_app(TEST_CONFIG);
+        slimr::enable_http(app, slimr::HttpServerOptions{.host = "127.0.0.1", .port = 10004});
         KeyEnvGuard missing(nullptr);
 
         {
+            std::ostringstream out, err;
             char arg0[] = "google-places-mcp";
-            char arg1[] = "status";
+            char arg1[] = "http";
             char *argv[] = {arg0, arg1, nullptr};
-            CHECK(app.run(2, argv) != 0);
+            CHECK(app.run(2, argv, out, err) != 0);
+            CHECK(err.str().find("GOOGLE_PLACES_API_KEY") != std::string::npos);
         }
         {
+            std::ostringstream out, err;
             char arg0[] = "google-places-mcp";
             char arg1[] = "--skip-checks";
-            char arg2[] = "status";
-            char *argv[] = {arg0, arg1, arg2, nullptr};
-            CHECK(app.run(3, argv) == 0);
+            char arg2[] = "http";
+            char arg3[] = "--"
+                          "tools";
+            char *argv[] = {arg0, arg1, arg2, arg3, nullptr};
+            CHECK(app.run(4, argv, out, err) != 0);
+            CHECK(err.str().find("GOOGLE_PLACES_API_KEY") == std::string::npos);
         }
         {
+            std::ostringstream out, err;
             char arg0[] = "google-places-mcp";
             char arg1[] = "--version";
             char *argv[] = {arg0, arg1, nullptr};
-            CHECK(app.run(2, argv) == 0);
+            CHECK(app.run(2, argv, out, err) == 0);
         }
         {
+            std::ostringstream out, err;
             char arg0[] = "google-places-mcp";
             char arg1[] = "--help";
             char *argv[] = {arg0, arg1, nullptr};
-            CHECK(app.run(2, argv) == 0);
+            CHECK(app.run(2, argv, out, err) == 0);
         }
 
         ::setenv("GOOGLE_PLACES_API_KEY", "test-key", 1);
         {
+            std::ostringstream out, err;
             char arg0[] = "google-places-mcp";
-            char arg1[] = "status";
-            char *argv[] = {arg0, arg1, nullptr};
-            CHECK(app.run(2, argv) == 0);
+            char arg1[] = "http";
+            char arg2[] = "--"
+                          "tools";
+            char *argv[] = {arg0, arg1, arg2, nullptr};
+            CHECK(app.run(3, argv, out, err) != 0);
+            CHECK(err.str().find("GOOGLE_PLACES_API_KEY") == std::string::npos);
         }
     }
 

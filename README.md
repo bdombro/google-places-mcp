@@ -58,7 +58,13 @@ Add to `.mcp.json`:
 }
 ```
 
-Or run via direct CLI (`google-places-mcp search '{"query":"pharmacy"}'`). Pass `--skip-checks` to bypass startup env validation when inspecting discovery or running offline commands.
+For `curl` debugging, every tool is also exposed by default at `/tools/<name>` (plus `GET /tools/openapi.json` and `GET /tools/schema`):
+
+```bash
+curl -X POST http://127.0.0.1:10004/tools/search -d '{"query":"pharmacy"}'
+```
+
+Pass `--skip-checks` to `google-places-mcp http` to bypass startup env validation when inspecting discovery or running offline.
 
 ## Tools
 
@@ -92,4 +98,4 @@ Or run via direct CLI (`google-places-mcp search '{"query":"pharmacy"}'`). Pass 
 
 ## Development
 
-See [docs/development.md](docs/development.md) for local builds, testing, and releases.
+See [docs/contributing.md](docs/contributing.md) for local builds, testing, and releases.

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Drop per-tool CLI, `--openapi`, and `--tools`; binaries are server-only and expose `/tools/<name>` HTTP endpoints by default.
+
 ## v3.1.1 - 2026-11-17
 
 - Serve OpenAPI 3.1 spec at `GET /openapi.json` and dump via `--openapi` (`slimr-serve` / `slimr-mcp` upgrade).
